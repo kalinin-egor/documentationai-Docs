@@ -1,0 +1,131 @@
+---
+title: Changelog
+description: Track the latest updates and improvements to GPUiq, including new features and bug fixes.
+---
+
+## Recent Releases
+
+Stay informed about GPUiq's evolution. You receive automatic notifications for major releases via your dashboard at `https://dashboard.example.com`. Review changes below to understand new capabilities for your AI training, rendering, or mining workloads.
+
+<Callout kind="info">
+  Enable release notifications in your account settings to get email alerts for new versions.
+</Callout>
+
+<Update label="2024-10-15" description="v1.3.0" tags={["feature", "improvement"]}>
+
+## New Features
+
+- **Snapshot Support**: Create and restore GPU instance snapshots for quick recovery during long-running ML jobs. Save configurations and data states instantly.
+- **Auto-Switching Enhancements**: Automatically switch to higher-performance GPUs when utilization exceeds `80%`.
+
+## Improvements
+
+- Reduced cold-start times by `30%` for A100 instances, enabling faster job launches.
+- Dashboard now shows real-time cost savings projections, highlighting up to `70%` reductions compared to on-premise setups.
+
+## Bug Fixes
+
+- Fixed intermittent connection drops during crypto mining sessions.
+- Resolved snapshot restore failures on multi-node clusters.
+
+</Update>
+
+<Update label="2024-09-20" description="v1.2.0" tags={["feature", "bugfix"]}>
+
+## New Features
+
+- **API Rate Limiting Controls**: Set custom limits per project to optimize resource allocation.
+- **Webhook Integrations**: Receive job completion events at `https://your-webhook-url.com/webhook`.
+
+## Improvements
+
+- Enhanced 3D rendering previews with WebGL acceleration in the dashboard.
+
+## Bug Fixes
+
+- Patched security vulnerability in token refresh endpoints (CVE-2024-5678).
+- Fixed billing discrepancies for fractional GPU hour usage.
+
+```javascript
+// Example: New webhook payload structure
+{
+  "event": "job.completed",
+  "instanceId": "gpu-12345",
+  "durationHours": 4.5,
+  "costSavings": 0.72
+}
+```
+
+</Update>
+
+<Update label="2024-08-10" description="v1.1.0" tags={["breaking", "feature"]}>
+
+## New Features
+
+- **Multi-Region Support**: Deploy instances across US-East, EU-West, and Asia-Pacific.
+- **CLI Tool v2**: Install via `npm install -g gpuiq-cli` for streamlined management.
+
+## Breaking Changes
+
+- Updated authentication to require `{API_KEY}` in headers instead of query params.
+
+## Bug Fixes
+
+- Corrected GPU utilization metrics reporting over `24h` periods.
+
+</Update>
+
+## Upgrade Instructions
+
+Follow these steps to update your GPUiq CLI or SDK to the latest version.
+
+<Steps>
+  <Step title="Check Current Version" icon="package">
+    Run the following command:
+    
+````bash
+gpuiq --version
+````
+  </Step>
+  <Step title="Update CLI" icon="download">
+    <Tabs>
+      <Tab title="npm" icon="nodejs">
+````bash
+npm install -g gpuiq-cli@latest
+````
+      </Tab>
+      <Tab title="Homebrew" icon="apple">
+````bash
+brew upgrade gpuiq-cli
+````
+      </Tab>
+    </Tabs>
+  </Step>
+  <Step title="Verify" icon="check-circle">
+    Test with a sample job:
+    
+````bash
+gpuiq run --gpu a100 --image tensorflow:latest --command "python train.py"
+````
+  </Step>
+</Steps>
+
+## Upcoming Features
+
+Explore what's next for GPUiq. These enhancements will further optimize your compute workflows.
+
+<Columns cols={3}>
+  <Card title="Dynamic Scaling" icon="trending-up" href="/concepts/scaling">
+    Automatically adjust GPU count based on workload demands.
+  </Card>
+  <Card title="Advanced Monitoring" icon="activity" href="/guides/monitoring">
+    Integrate with Prometheus for custom alerts.
+  </Card>
+  <Card title="Spot Instance Bidding" icon="dollar-sign" href="/configuration/pricing">
+    Bid on unused capacity for even greater savings.
+  </Card>
+</Columns>
+
+<Callout kind="tip">
+  Provide feedback on these features via the [feedback form](https://dashboard.example.com/feedback) or join our Discord community.
+</Callout>

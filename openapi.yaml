@@ -1,0 +1,147 @@
+openapi: '3.0.0'
+info:
+  version: 1.0.0
+  title: Егор Калинин
+  license:
+    name: MIT
+servers:
+  - url: http://petstore.swagger.io/v1
+paths:
+  /instances:
+    get:
+      summary: List all instances
+      operationId: listInstances
+      parameters:
+        - name: limit
+          in: query
+          description: How many items to return at one time (max 100)
+          required: false
+          schema:
+            type: integer
+            format: int32
+      responses:
+        200:
+          description: A paged array of GPU instances
+          headers:
+            x-next:
+              description: A link to the next page of responses
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Instances'
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      summary: Create instance
+      operationId: createInstance
+      responses:
+        201:
+          description: Null response
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /instances/{instanceId}:
+    get:
+      summary: Get instance info
+      operationId: showInstanceById
+      parameters:
+        - name: instanceId
+          in: path
+          required: true
+          description: The id of the instance to retrieve
+          schema:
+            type: string
+      responses:
+        200:
+          description: Expected response to a valid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Instances'
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /snapshots:
+    get:
+      summary: List all snapshots
+      operationId: listSnapshots
+      parameters:
+        - name: limit
+          in: query
+          description: How many items to return at one time (max 100)
+          required: false
+          schema:
+            type: integer
+            format: int32
+      responses:
+        200:
+          description: A paged array of snapshots
+          headers:
+            x-next:
+              description: A link to the next page of responses
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Snapshots'
+        default:
+          description: unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Instance:
+      required:
+        - id
+        - type
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+    Instances:
+      type: array
+      items:
+        $ref: '#/components/schemas/Instance'
+    Snapshot:
+      required:
+        - id
+        - instanceId
+      properties:
+        id:
+          type: string
+        instanceId:
+          type: string
+        createdAt:
+          type: string
+    Snapshots:
+      type: array
+      items:
+        $ref: '#/components/schemas/Snapshot'
+    Error:
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string

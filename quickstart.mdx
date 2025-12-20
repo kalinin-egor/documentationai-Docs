@@ -1,0 +1,161 @@
+---
+title: Get Started with GPUiq
+description: Set up your account and launch your first GPU instance in minutes to begin your compute tasks.
+---
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+- A valid email address for account verification
+- Basic knowledge of SSH for connecting to instances (optional for dashboard access)
+- A payment method for billing GPU usage
+
+<Callout kind="info">
+
+GPUiq offers a free trial credit upon signup. No credit card required initially.
+
+</Callout>
+
+## Create Your Account
+
+Follow these steps to sign up and verify your email.
+
+<Steps>
+  <Step title="Sign Up" icon="user-plus">
+    Visit [https://dashboard.example.com](https://dashboard.example.com) and click **Sign Up**.
+
+    Fill in your email, password, and desired username.
+  </Step>
+  <Step title="Verify Email" icon="mail">
+    Check your inbox for a verification email from GPUiq.
+
+    Click the verification link to activate your account.
+  </Step>
+  <Step title="Log In" icon="log-in">
+    Return to the dashboard and log in with your credentials.
+
+    You'll land on the main dashboard overview.
+  </Step>
+</Steps>
+
+## Navigate the Dashboard
+
+The GPUiq dashboard provides quick access to your instances, billing, and configurations.
+
+<Columns cols={3}>
+  <Card title="Instances" icon="server" href="#launch-instance">
+    View, start, stop, and manage your GPU instances.
+  </Card>
+  <Card title="Billing" icon="credit-card" href="/configuration">
+    Track usage, costs, and add payment methods.
+  </Card>
+  <Card title="Snapshots" icon="save" href="/introduction">
+    Create and restore instance snapshots for easy backups.
+  </Card>
+</Columns>
+
+## Launch Your First GPU Instance
+
+Select a powerful GPU and deploy it in seconds.
+
+<Steps>
+  <Step title="Choose GPU Type" icon="zap">
+    From the dashboard, click **New Instance**.
+
+    Select a GPU model like NVIDIA A100 or H100 based on your task (AI, rendering, mining).
+  </Step>
+  <Step title="Configure Basics" icon="settings">
+    Set instance size, storage (`>100GB` recommended), and region closest to you.
+
+    Enable auto-scaling if needed for variable workloads.
+  </Step>
+  <Step title="Deploy" icon="rocket">
+    Review settings and click **Launch**.
+
+    Your instance is ready in under 60 seconds.
+  </Step>
+</Steps>
+
+<Tabs>
+  <Tab title="SSH Connection" icon="terminal">
+    Use the provided SSH command from the dashboard.
+
+````bash
+ssh root@{public-ip} -p 22 -i gpu-key.pem
+````
+  </Tab>
+  <Tab title="API Launch" icon="code">
+    Launch programmatically for automation.
+
+<CodeGroup tabs="cURL,JavaScript">
+```bash
+curl -X POST https://api.example.com/v1/instances \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gpu_type": "A100",
+    "storage_gb": 200,
+    "region": "us-east"
+  }'
+```
+
+```javascript
+const response = await fetch('https://api.example.com/v1/instances', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_KEY',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    gpu_type: 'A100',
+    storage_gb: 200,
+    region: 'us-east'
+  })
+});
+```
+</CodeGroup>
+  </Tab>
+</Tabs>
+
+## Basic Configuration
+
+Customize your instance post-launch.
+
+<ParamField path="gpu_type" param-type="string" required="true">
+  Specifies the GPU model, e.g., `A100` or `H100`.
+</ParamField>
+
+<ParamField query="auto_scale" param-type="boolean" required="false">
+  Enables automatic scaling based on load (`true`/`false`).
+</ParamField>
+
+For AI tasks, install CUDA via SSH:
+
+````bash
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb
+sudo dpkg -i cuda-keyring_1.0-1_all.deb
+sudo apt-get update
+sudo apt-get -y install cuda
+````
+
+<Callout kind="tip">
+
+Save your instance as a snapshot after initial setup to reuse configurations quickly, saving up to 70% on costs.
+
+</Callout>
+
+## Next Steps
+
+- Monitor performance in the dashboard
+- Explore advanced features like automatic switching
+- Integrate with your workflows using the API
+
+<Columns cols={2}>
+  <Card title="API Reference" icon="book-open" href="/authentication">
+    Authenticate and manage instances via API.
+  </Card>
+  <Card title="Troubleshooting" icon="help-circle" href="/help-center">
+    Common issues and solutions.
+  </Card>
+</Columns>
