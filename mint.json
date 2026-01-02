@@ -1,0 +1,72 @@
+{
+  "name": "GPUniq Docs",
+  "colors": {
+    "primary": "#9463e3"
+  },
+  "navigation": [
+    {
+      "group": "Documentation",
+      "pages": [
+        {
+          "group": "Getting Started",
+          "pages": [
+            "introduction",
+            "quickstart"
+          ]
+        },
+        {
+          "group": "Core Concepts",
+          "pages": [
+            "features"
+          ]
+        },
+        {
+          "group": "Guides",
+          "pages": [
+            "managing-instances"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        {
+          "name": "API Reference",
+          "path": "api-reference",
+          "openapi": "openapi.yaml"
+        }
+      ]
+    },
+    {
+      "group": "Help Center",
+      "pages": [
+        "help-center",
+        {
+          "group": "FAQs",
+          "pages": [
+            "help-center/faq/egor-kalinin"
+          ]
+        },
+        {
+          "group": "Troubleshooting",
+          "pages": [
+            "help-center/troubleshooting/connection-issues"
+          ]
+        },
+        {
+          "group": "Guides",
+          "pages": [
+            "help-center/guides/rent-your-first-gpu"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "Changelog",
+      "pages": [
+        "changelog"
+      ]
+    }
+  ]
+}
