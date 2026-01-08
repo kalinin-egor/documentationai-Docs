@@ -1,0 +1,13 @@
+{
+  "name": "gpuniq-docs",
+  "version": "1.0.0",
+  "description": "GPUniq Documentation",
+  "scripts": {
+    "build": "mintlify build",
+    "dev": "mintlify dev"
+  },
+  "devDependencies": {
+    "mintlify": "^4.2.256"
+  }
+}
+
