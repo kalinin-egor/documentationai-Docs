@@ -1,11 +1,12 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "GPUniq Docs",
+  "name": "GPUniq",
   "logo": {
-    "dark": "/logo.ico",
-    "light": "/logo.ico"
+    "dark": "https://gpuniq.com/logo.ico",
+    "light": "https://gpuniq.com/logo.ico",
+    "href": "https://gpuniq.com"
   },
-  "favicon": "/logo.ico",
+  "favicon": "https://gpuniq.com/logo.ico",
   "colors": {
     "primary": "#9463e3",
     "light": "#b084f0",
@@ -22,8 +23,8 @@
     }
   ],
   "topbarCtaButton": {
-    "name": "Dashboard",
-    "url": "https://gpuniq.com"
+    "name": "Sign Up",
+    "url": "https://gpuniq.com/auth/register"
   },
   "tabs": [
     {
@@ -33,14 +34,14 @@
   ],
   "anchors": [
     {
+      "name": "Dashboard",
+      "icon": "gauge",
+      "url": "https://gpuniq.com"
+    },
+    {
       "name": "Telegram",
       "icon": "telegram",
       "url": "https://t.me/gpuniq"
-    },
-    {
-      "name": "GitHub",
-      "icon": "github",
-      "url": "https://github.com/gpuniq"
     }
   ],
   "navigation": [
@@ -91,7 +92,7 @@
   ],
   "footerSocials": {
     "telegram": "https://t.me/gpuniq",
-    "github": "https://github.com/gpuniq"
+    "website": "https://gpuniq.com"
   },
   "api": {
     "baseUrl": "https://api.gpuniq.com",
@@ -99,5 +100,17 @@
       "method": "bearer"
     }
   },
-  "openapi": "openapi.yaml"
+  "openapi": "openapi.yaml",
+  "feedback": {
+    "thumbsRating": true,
+    "suggestEdit": true
+  },
+  "seo": {
+    "indexHiddenPages": false
+  },
+  "analytics": {
+    "ga4": {
+      "measurementId": ""
+    }
+  }
 }
