@@ -1,147 +1,917 @@
-openapi: '3.0.0'
+openapi: '3.1.0'
 info:
-  version: 1.0.0
+  version: 0.5.1
   title: GPUniq API
-  license:
-    name: MIT
+  description: GPU rental marketplace API for browsing GPUs, managing rentals, and handling payments.
+  contact:
+    email: support@gpuniq.com
+    url: https://gpuniq.com
 servers:
-  - url: http://petstore.swagger.io/v1
+  - url: https://api.gpuniq.com
+    description: Production server
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Authorization
+    description: User authentication and account management
+  - name: Marketplace
+    description: Browse and rent GPUs
+  - name: Instances
+    description: Manage your GPU rentals
+  - name: Payments
+    description: Deposits, withdrawals, and billing
+  - name: AI
+    description: AI-powered GPU recommendations
+  - name: Crypto
+    description: USDT payments and withdrawals
+
 paths:
-  /instances:
-    get:
-      summary: List all instances
-      operationId: listInstances
-      parameters:
-        - name: limit
-          in: query
-          description: How many items to return at one time (max 100)
-          required: false
-          schema:
-            type: integer
-            format: int32
-      responses:
-        200:
-          description: A paged array of GPU instances
-          headers:
-            x-next:
-              description: A link to the next page of responses
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Instances'
-        default:
-          description: unexpected error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+  /v1/auth/register:
     post:
-      summary: Create instance
-      operationId: createInstance
+      tags: [Authorization]
+      summary: Register new user
+      description: Register a new user account. A verification code will be sent to the email.
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, username, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                username:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
       responses:
-        201:
-          description: Null response
-        default:
-          description: unexpected error
+        '200':
+          description: Registration initiated, verification code sent
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-  /instances/{instanceId}:
+                $ref: '#/components/schemas/Response'
+
+  /v1/auth/confirm-registration:
+    post:
+      tags: [Authorization]
+      summary: Confirm registration
+      description: Confirm registration using the verification code sent to email.
+      operationId: confirmRegistration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [temp_token, confirmation_code]
+              properties:
+                temp_token:
+                  type: string
+                confirmation_code:
+                  type: string
+      responses:
+        '200':
+          description: Registration confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+
+  /v1/auth/login:
+    post:
+      tags: [Authorization]
+      summary: Login
+      description: Authenticate and receive JWT tokens.
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+
+  /v1/auth/me:
     get:
-      summary: Get instance info
-      operationId: showInstanceById
+      tags: [Authorization]
+      summary: Get current user
+      description: Get profile of the authenticated user.
+      operationId: getCurrentUser
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+
+  /v1/auth/google:
+    get:
+      tags: [Authorization]
+      summary: Google OAuth
+      description: Initiate Google OAuth authentication flow.
+      operationId: googleAuth
       parameters:
-        - name: instanceId
-          in: path
-          required: true
-          description: The id of the instance to retrieve
+        - name: redirect_url
+          in: query
           schema:
             type: string
       responses:
-        200:
-          description: Expected response to a valid request
+        '200':
+          description: OAuth redirect URL
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Instances'
-        default:
-          description: unexpected error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  /snapshots:
+                $ref: '#/components/schemas/Response'
+
+  /v1/marketplace/list:
     get:
-      summary: List all snapshots
-      operationId: listSnapshots
+      tags: [Marketplace]
+      summary: List available GPUs
+      description: Browse available GPUs with filtering options.
+      operationId: listMarketplace
       parameters:
-        - name: limit
+        - name: gpu_model
           in: query
-          description: How many items to return at one time (max 100)
-          required: false
+          description: Filter by GPU model (e.g., "RTX 4090", "A100")
+          schema:
+            type: string
+        - name: min_vram_gb
+          in: query
+          description: Minimum VRAM in GB
           schema:
             type: integer
-            format: int32
+        - name: max_vram_gb
+          in: query
+          description: Maximum VRAM in GB
+          schema:
+            type: integer
+        - name: min_price_per_hour
+          in: query
+          description: Minimum price per hour in USD
+          schema:
+            type: number
+        - name: max_price_per_hour
+          in: query
+          description: Maximum price per hour in USD
+          schema:
+            type: number
+        - name: location
+          in: query
+          description: Geographic location filter
+          schema:
+            type: string
+        - name: verified
+          in: query
+          description: Show only verified providers
+          schema:
+            type: boolean
+        - name: gpu_count
+          in: query
+          description: Minimum GPU count
+          schema:
+            type: integer
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            default: 20
       responses:
-        200:
-          description: A paged array of snapshots
-          headers:
-            x-next:
-              description: A link to the next page of responses
-              schema:
-                type: string
+        '200':
+          description: List of available GPUs
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Snapshots'
-        default:
-          description: unexpected error
+                $ref: '#/components/schemas/MarketplaceListResponse'
+
+  /v1/marketplace/agent/{agent_id}:
+    get:
+      tags: [Marketplace]
+      summary: Get GPU details
+      description: Get detailed information about a specific GPU/agent.
+      operationId: getAgentDetails
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Agent details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/Response'
+
+  /v1/marketplace/order:
+    post:
+      tags: [Marketplace]
+      summary: Create rental order
+      description: Rent a GPU. Returns SSH credentials upon success.
+      operationId: createOrder
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agent_id]
+              properties:
+                agent_id:
+                  type: integer
+                  description: ID of the GPU to rent
+                gpu_required:
+                  type: integer
+                  description: Number of GPUs to reserve
+                  default: 0
+                docker_image:
+                  type: string
+                  description: Docker image to use (optional)
+                pricing_type:
+                  type: string
+                  enum: [minute, hour, day, week, month]
+                  default: minute
+      responses:
+        '200':
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+
+  /v1/marketplace/order/async:
+    post:
+      tags: [Marketplace]
+      summary: Create rental order (async)
+      description: Create order asynchronously. Returns job_id for status polling.
+      operationId: createOrderAsync
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agent_id]
+              properties:
+                agent_id:
+                  type: integer
+                gpu_required:
+                  type: integer
+                  default: 0
+                pricing_type:
+                  type: string
+                  default: minute
+      responses:
+        '200':
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncJobResponse'
+
+  /v1/marketplace/order/status/{job_id}:
+    get:
+      tags: [Marketplace]
+      summary: Get order status
+      description: Poll for async order creation status.
+      operationId: getOrderStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+
+  /v1/instances/my:
+    get:
+      tags: [Instances]
+      summary: List my instances
+      description: Get list of your active GPU rentals.
+      operationId: listMyInstances
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: List of instances
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstanceListResponse'
+
+  /v1/instances/{task_id}:
+    get:
+      tags: [Instances]
+      summary: Get instance details
+      description: Get detailed information about a specific rental.
+      operationId: getInstanceDetails
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Instance details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstanceResponse'
+    delete:
+      tags: [Instances]
+      summary: Delete instance
+      description: Terminate a rental permanently.
+      operationId: deleteInstance
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Instance deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+
+  /v1/instances/{task_id}/start:
+    post:
+      tags: [Instances]
+      summary: Start instance
+      description: Resume a stopped instance.
+      operationId: startInstance
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Instance started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+
+  /v1/instances/{task_id}/stop:
+    post:
+      tags: [Instances]
+      summary: Stop instance
+      description: Stop a running instance to pause billing.
+      operationId: stopInstance
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Instance stopped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Response'
+
+  /v1/payments/deposit:
+    post:
+      tags: [Payments]
+      summary: Create deposit (YooKassa)
+      description: Create a deposit request using YooKassa.
+      operationId: createDeposit
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount:
+                  type: integer
+                  minimum: 1
+                  description: Amount in rubles
+                payment_system:
+                  type: string
+                  enum: [YOOKASSA, OKX]
+                  default: YOOKASSA
+      responses:
+        '200':
+          description: Payment URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepositResponse'
+
+  /v1/payments/history:
+    get:
+      tags: [Payments]
+      summary: Get payment history
+      description: Get list of all payments.
+      operationId: getPaymentHistory
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Payment history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentHistoryResponse'
+
+  /v1/crypto/balance:
+    get:
+      tags: [Crypto]
+      summary: Get balance
+      description: Get user's USDT balance.
+      operationId: getCryptoBalance
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Balance info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+
+  /v1/crypto/deposit/address:
+    post:
+      tags: [Crypto]
+      summary: Get deposit address
+      description: Get USDT TRC20 address for deposits.
+      operationId: getDepositAddress
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id:
+                  type: integer
+      responses:
+        '200':
+          description: Deposit address
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepositAddressResponse'
+
+  /v1/crypto/withdrawal:
+    post:
+      tags: [Crypto]
+      summary: Create withdrawal
+      description: Withdraw USDT to external wallet.
+      operationId: createWithdrawal
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, address]
+              properties:
+                amount:
+                  type: number
+                  minimum: 0
+                  description: Amount in USDT
+                address:
+                  type: string
+                  description: TRC20 wallet address
+                network:
+                  type: string
+                  default: TRC20
+      responses:
+        '200':
+          description: Withdrawal created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WithdrawalResponse'
+
+  /v1/crypto/transactions:
+    get:
+      tags: [Crypto]
+      summary: Get transaction history
+      description: Get crypto transaction history.
+      operationId: getTransactionHistory
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: transaction_type
+          in: query
+          schema:
+            type: string
+            enum: [deposit, withdrawal]
+      responses:
+        '200':
+          description: Transaction history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionHistoryResponse'
+
+  /v1/ai/recommendation:
+    post:
+      tags: [AI]
+      summary: Get GPU recommendation
+      description: Get AI-powered GPU recommendations based on your query.
+      operationId: getRecommendation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  minLength: 1
+                  maxLength: 5000
+                  description: Natural language query about GPU needs
+      responses:
+        '200':
+          description: AI recommendation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationResponse'
+
+  /v1/health:
+    get:
+      tags: [System]
+      summary: Health check
+      description: Check API health status.
+      operationId: healthCheck
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
-    Instance:
-      required:
-        - id
-        - type
+    Response:
+      type: object
+      properties:
+        exception:
+          type: integer
+          nullable: true
+        data:
+          type: object
+          nullable: true
+        message:
+          type: string
+          nullable: true
+
+    LoginResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            access_token:
+              type: string
+            refresh_token:
+              type: string
+            user:
+              type: object
+              properties:
+                id:
+                  type: integer
+                email:
+                  type: string
+                username:
+                  type: string
+
+    MarketplaceListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Agent'
+            total:
+              type: integer
+            page:
+              type: integer
+            page_size:
+              type: integer
+
+    Agent:
+      type: object
       properties:
         id:
+          type: integer
+        hostname:
           type: string
-        type:
+        location:
           type: string
         status:
           type: string
-    Instances:
-      type: array
-      items:
-        $ref: '#/components/schemas/Instance'
-    Snapshot:
-      required:
-        - id
-        - instanceId
-      properties:
-        id:
+          enum: [online, offline, busy]
+        gpu_model:
           type: string
-        instanceId:
-          type: string
-        createdAt:
-          type: string
-    Snapshots:
-      type: array
-      items:
-        $ref: '#/components/schemas/Snapshot'
-    Error:
-      required:
-        - code
-        - message
-      properties:
-        code:
+        gpu_count:
           type: integer
-          format: int32
-        message:
+        vram_gb:
+          type: integer
+        total_ram_gb:
+          type: integer
+        price_per_hour:
+          type: number
+        price_per_day:
+          type: number
+        price_per_week:
+          type: number
+        price_per_month:
+          type: number
+        verified:
+          type: boolean
+        reliability:
+          type: number
+
+    OrderResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            task_id:
+              type: integer
+            ssh_host:
+              type: string
+            ssh_port:
+              type: integer
+            ssh_password:
+              type: string
+            status:
+              type: string
+
+    AsyncJobResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            job_id:
+              type: string
+
+    InstanceListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Instance'
+            total:
+              type: integer
+
+    Instance:
+      type: object
+      properties:
+        task_id:
+          type: integer
+        agent_id:
+          type: integer
+        status:
           type: string
+        ssh_host:
+          type: string
+        ssh_port:
+          type: integer
+        ssh_password:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        hourly_cost:
+          type: number
+
+    InstanceResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Instance'
+
+    DepositResponse:
+      type: object
+      properties:
+        confirmation_url:
+          type: string
+        payment_id:
+          type: string
+
+    PaymentHistoryResponse:
+      type: object
+      properties:
+        invoices:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              amount:
+                type: number
+              status:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+
+    BalanceResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+        balance:
+          type: number
+        available_balance:
+          type: number
+        frozen_balance:
+          type: number
+        updated_at:
+          type: string
+          format: date-time
+
+    DepositAddressResponse:
+      type: object
+      properties:
+        address:
+          type: string
+        network:
+          type: string
+          default: TRC20
+        currency:
+          type: string
+          default: USDT
+        min_amount:
+          type: number
+        expires_at:
+          type: string
+          format: date-time
+
+    WithdrawalResponse:
+      type: object
+      properties:
+        withdrawal_id:
+          type: string
+        amount:
+          type: number
+        fee:
+          type: number
+        address:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    TransactionHistoryResponse:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items:
+            type: object
+            properties:
+              transaction_id:
+                type: string
+              type:
+                type: string
+                enum: [deposit, withdrawal]
+              amount:
+                type: number
+              status:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+        total_count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+
+    RecommendationResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            recommendation:
+              type: string
+            suggested_gpus:
+              type: array
+              items:
+                type: object
+                properties:
+                  model:
+                    type: string
+                  reason:
+                    type: string

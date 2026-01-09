@@ -1,29 +1,112 @@
 ---
-title: Cannot Connect to Rented GPU
-description: How to fix connection issues with your GPUiq instance.
+title: Connection Issues
+description: How to fix connection problems with your GPUniq GPU rental.
 ---
 
 ## Problem
 
-- Server not responding after rental
-- SSH or remote desktop times out
+- SSH connection times out
+- "Connection refused" error
+- Can't reach the GPU after renting
 
-## Quick Fix
+## Quick Diagnosis
 
 <Steps>
-  <Step title="Check rental status">
-    ````bash
-    Visit your GPUiq dashboard. Make sure your GPU is 'Active'.
-    ````
+  <Step title="Check Instance Status">
+    Go to **My Instances** in your dashboard.
+    
+    Verify your instance shows **Running** status.
+    
+    If it shows "Stopped" or "Error", the connection won't work.
   </Step>
-  <Step title="Verify SSH details">
-    ````bash
-    Use the exact SSH IP and port shown under your rental details.
-    ````
+  <Step title="Verify SSH Details">
+    Double-check you're using the exact credentials from your dashboard:
+    - **Host**: The IP address or hostname
+    - **Port**: The specific SSH port (often not 22)
+    - **Password**: The generated password (copy-paste to avoid typos)
+    
+    ```bash
+    ssh root@{host} -p {port}
+    ```
   </Step>
-  <Step title="Restart instance">
-    ````bash
-    Click 'Restart' in the dashboard to resolve common setup issues.
-    ````
+  <Step title="Check Your Network">
+    Ensure your network allows outbound SSH connections.
+    
+    Some corporate/school networks block non-standard ports.
+    
+    Try from a different network or use a VPN.
+  </Step>
+  <Step title="Wait a Moment">
+    New instances may take 30-60 seconds to fully initialize.
+    
+    If you just rented, wait a minute and try again.
   </Step>
 </Steps>
+
+## Common Fixes
+
+### Instance Stuck
+
+If your instance shows "Running" but won't connect:
+
+1. Click **Stop** on the instance
+2. Wait 30 seconds
+3. Click **Start** to restart
+4. Try connecting again with new credentials
+
+### Port Blocked
+
+If connection times out (not refused):
+
+```bash
+# Test if port is reachable
+nc -zv {host} {port}
+```
+
+If this fails, your network may be blocking the port. Try:
+- Using a different network
+- Connecting via VPN
+- Contacting your IT department
+
+### Password Issues
+
+Passwords are case-sensitive and may contain special characters.
+
+**Best practice**: Copy the password directly from the dashboard rather than typing it.
+
+If using a terminal that interprets special characters:
+
+```bash
+# Use quotes around password if prompted
+ssh root@{host} -p {port}
+Password: "your_password_here"
+```
+
+## Still Having Issues?
+
+### Restart the Rental
+
+1. Delete the current instance
+2. Rent the same GPU again
+3. Fresh instances often resolve mysterious issues
+
+### Try a Different GPU
+
+If one provider's GPU won't connect, try renting from a different provider. Look for:
+- **Verified** badge (indicates tested reliability)
+- Higher **reliability score**
+
+### Contact Support
+
+If nothing works:
+
+1. Note your **Task ID** from the dashboard
+2. Email [support@gpuniq.com](mailto:support@gpuniq.com) with:
+   - Task ID
+   - Error message (screenshot if possible)
+   - What you've already tried
+3. Or reach out on [Telegram](https://t.me/gpuniq) for faster response
+
+<Callout kind="info">
+  Provider-side issues (network, hardware) can sometimes cause connection problems. Our support team can check provider status and help troubleshoot.
+</Callout>

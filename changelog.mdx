@@ -1,131 +1,134 @@
 ---
 title: Changelog
-description: Track the latest updates and improvements to GPUiq, including new features and bug fixes.
+description: Track the latest updates and improvements to GPUniq, including new features and bug fixes.
 ---
 
 ## Recent Releases
 
-Stay informed about GPUiq's evolution. You receive automatic notifications for major releases via your dashboard at `https://dashboard.example.com`. Review changes below to understand new capabilities for your AI training, rendering, or mining workloads.
+Stay informed about GPUniq's evolution. Review changes below to understand new capabilities for your AI training, rendering, or mining workloads.
 
 <Callout kind="info">
-  Enable release notifications in your account settings to get email alerts for new versions.
+  Follow us on Telegram for real-time announcements and community discussions.
 </Callout>
 
-<Update label="2024-10-15" description="v1.3.0" tags={["feature", "improvement"]}>
+<Update label="2026-01-09" description="v0.5.1" tags={["feature", "improvement"]}>
 
 ## New Features
 
-- **Snapshot Support**: Create and restore GPU instance snapshots for quick recovery during long-running ML jobs. Save configurations and data states instantly.
-- **Auto-Switching Enhancements**: Automatically switch to higher-performance GPUs when utilization exceeds `80%`.
+- **GPU Analytics Dashboard**: Comprehensive market analytics with price tracking, availability trends, and GPU model comparisons across providers.
+- **Enhanced AI Recommendations**: Improved AI assistant now considers your usage history and budget constraints for better GPU suggestions.
+- **Async Order Creation**: New `/v1/marketplace/order/async` endpoint for reliable order creation with job status polling.
 
 ## Improvements
 
-- Reduced cold-start times by `30%` for A100 instances, enabling faster job launches.
-- Dashboard now shows real-time cost savings projections, highlighting up to `70%` reductions compared to on-premise setups.
+- Faster marketplace loading with optimized database queries
+- Improved SSH connection reliability with automatic port allocation
+- Enhanced provider verification system with reliability scoring
+- Better error messages for payment and rental issues
 
 ## Bug Fixes
 
-- Fixed intermittent connection drops during crypto mining sessions.
-- Resolved snapshot restore failures on multi-node clusters.
+- Fixed occasional timeout issues during peak marketplace usage
+- Resolved balance calculation discrepancies for long-running rentals
+- Fixed session management issues causing unexpected logouts
 
 </Update>
 
-<Update label="2024-09-20" description="v1.2.0" tags={["feature", "bugfix"]}>
+<Update label="2025-11-15" description="v0.4.0" tags={["feature", "crypto"]}>
 
 ## New Features
 
-- **API Rate Limiting Controls**: Set custom limits per project to optimize resource allocation.
-- **Webhook Integrations**: Receive job completion events at `https://your-webhook-url.com/webhook`.
+- **USDT Payments (TRC20)**: Deposit and withdraw funds using Tether on Tron network
+- **Flexible Pricing Types**: Choose between per-minute, hourly, daily, weekly, or monthly billing
+- **Provider Dashboard**: GPU owners can now manage their listings, view active rentals, and track earnings
 
 ## Improvements
 
-- Enhanced 3D rendering previews with WebGL acceleration in the dashboard.
+- Real-time balance updates during rentals
+- Improved marketplace filters with VRAM and location options
+- Enhanced mobile responsiveness
 
 ## Bug Fixes
 
-- Patched security vulnerability in token refresh endpoints (CVE-2024-5678).
-- Fixed billing discrepancies for fractional GPU hour usage.
-
-```javascript
-// Example: New webhook payload structure
-{
-  "event": "job.completed",
-  "instanceId": "gpu-12345",
-  "durationHours": 4.5,
-  "costSavings": 0.72
-}
-```
+- Fixed provider port range conflicts
+- Resolved rental duration calculation issues
 
 </Update>
 
-<Update label="2024-08-10" description="v1.1.0" tags={["breaking", "feature"]}>
+<Update label="2025-09-20" description="v0.3.0" tags={["feature", "api"]}>
 
 ## New Features
 
-- **Multi-Region Support**: Deploy instances across US-East, EU-West, and Asia-Pacific.
-- **CLI Tool v2**: Install via `npm install -g gpuiq-cli` for streamlined management.
+- **AI GPU Recommendations**: Ask natural language questions to get GPU suggestions
+- **Task History API**: Track your rental history with detailed statistics
+- **Session Management**: View and manage active login sessions
 
-## Breaking Changes
+## Improvements
 
-- Updated authentication to require `{API_KEY}` in headers instead of query params.
+- Enhanced API documentation with OpenAPI 3.1 spec
+- Improved error handling with detailed messages
+- Faster marketplace search with caching
 
 ## Bug Fixes
 
-- Corrected GPU utilization metrics reporting over `24h` periods.
+- Fixed authentication token refresh issues
+- Resolved marketplace pagination bugs
+
+</Update>
+
+<Update label="2025-07-10" description="v0.2.0" tags={["feature", "provider"]}>
+
+## New Features
+
+- **Multi-GPU Support**: Rent machines with multiple GPUs
+- **Provider Agent**: Install our agent to connect your GPUs to the marketplace
+- **Heartbeat Monitoring**: Real-time provider availability tracking
+
+## Improvements
+
+- Streamlined registration flow with email verification
+- Google OAuth integration for quick sign-up
+- Better GPU specification display
+
+## Bug Fixes
+
+- Fixed SSH connection issues with certain providers
+- Resolved payment processing delays
+
+</Update>
+
+<Update label="2025-05-01" description="v0.1.0" tags={["launch"]}>
+
+## Initial Launch
+
+- **GPU Marketplace**: Browse and rent GPUs from providers worldwide
+- **Instant SSH Access**: Get SSH credentials immediately after rental
+- **YooKassa Payments**: Support for Russian payment methods
+- **User Dashboard**: Manage rentals, view balance, track usage
+- **REST API**: Full API access for automation
 
 </Update>
 
 ## Upgrade Instructions
 
-Follow these steps to update your GPUiq CLI or SDK to the latest version.
-
-<Steps>
-  <Step title="Check Current Version" icon="package">
-    Run the following command:
-    
-````bash
-gpuiq --version
-````
-  </Step>
-  <Step title="Update CLI" icon="download">
-    <Tabs>
-      <Tab title="npm" icon="nodejs">
-````bash
-npm install -g gpuiq-cli@latest
-````
-      </Tab>
-      <Tab title="Homebrew" icon="apple">
-````bash
-brew upgrade gpuiq-cli
-````
-      </Tab>
-    </Tabs>
-  </Step>
-  <Step title="Verify" icon="check-circle">
-    Test with a sample job:
-    
-````bash
-gpuiq run --gpu a100 --image tensorflow:latest --command "python train.py"
-````
-  </Step>
-</Steps>
+GPUniq is a web-based platform - no client updates required. API clients should update to the latest endpoints as documented in the API Reference.
 
 ## Upcoming Features
 
-Explore what's next for GPUiq. These enhancements will further optimize your compute workflows.
+Explore what's next for GPUniq.
 
 <Columns cols={3}>
-  <Card title="Dynamic Scaling" icon="trending-up" href="/concepts/scaling">
-    Automatically adjust GPU count based on workload demands.
+  <Card title="Docker Image Support" icon="box" href="/features">
+    Specify custom Docker images when renting GPUs.
   </Card>
-  <Card title="Advanced Monitoring" icon="activity" href="/guides/monitoring">
-    Integrate with Prometheus for custom alerts.
+  <Card title="Team Accounts" icon="users" href="/features">
+    Shared billing and instance management for teams.
   </Card>
-  <Card title="Spot Instance Bidding" icon="dollar-sign" href="/configuration/pricing">
-    Bid on unused capacity for even greater savings.
+  <Card title="Reserved Capacity" icon="calendar" href="/features">
+    Book GPUs in advance for guaranteed availability.
   </Card>
 </Columns>
 
 <Callout kind="tip">
-  Provide feedback on these features via the [feedback form](https://dashboard.example.com/feedback) or join our Discord community.
+  Have feature requests? Join our Telegram community or email [support@gpuniq.com](mailto:support@gpuniq.com).
 </Callout>

@@ -1,31 +1,113 @@
 ---
 title: How to Rent Your First GPU
-description: Get started with renting a GPU from GPUiq.
+description: Complete guide to renting a GPU from GPUniq marketplace.
 ---
 
 ## Quick Start
 
-Rent a powerful GPU in a few steps.
+Rent a powerful GPU in a few simple steps.
 
 <Steps>
-  <Step title="Sign in">
-    ````
-    Go to gpuiq.com and log in to your account.
-    ````
+  <Step title="Create Account">
+    Go to [gpuniq.com](https://gpuniq.com) and sign up with your email or Google account.
+    
+    Verify your email with the 6-digit code sent to your inbox.
   </Step>
-  <Step title="Choose a GPU">
-    ````
-    Select your desired GPU model (NVIDIA, AMD, etc.) and location.
-    ````
+  <Step title="Add Funds">
+    Navigate to **Balance** in your dashboard.
+    
+    Choose your deposit method:
+    - **USDT (TRC20)**: Send to the provided wallet address
+    - **YooKassa**: Pay with Russian bank cards
+    
+    Wait for your balance to update (crypto: ~2-5 min, cards: instant).
   </Step>
-  <Step title="Configure rental">
-    ````
-    Set duration, storage, and features like snapshots or auto-switch.
-    ````
+  <Step title="Browse Marketplace">
+    Use filters to find the right GPU:
+    - **GPU Model**: RTX 4090, A100, H100, etc.
+    - **VRAM**: Minimum gigabytes needed
+    - **Price**: Maximum hourly rate
+    - **Verified**: Show only reliable providers
   </Step>
-  <Step title="Start instance">
-    ````
-    Click 'Rent Now'. Access details will appear instantly in your dashboard.
-    ````
+  <Step title="Select GPU">
+    Click on a GPU card to view details:
+    - Full hardware specifications
+    - Provider reliability score
+    - Current availability
+    - Pricing options
+  </Step>
+  <Step title="Rent">
+    Click **Rent Now** and choose:
+    - Per minute (most flexible)
+    - Per hour, day, week, or month (discounts)
+    
+    Your instance starts immediately!
+  </Step>
+  <Step title="Connect">
+    Find your SSH credentials in the dashboard:
+    
+    ```bash
+    ssh root@{host} -p {port}
+    # Password shown in dashboard
+    ```
+    
+    You're now connected to your GPU!
   </Step>
 </Steps>
+
+## What to Do After Connecting
+
+### Verify GPU Access
+
+```bash
+# Check GPU is detected
+nvidia-smi
+
+# Verify CUDA
+nvcc --version
+```
+
+### Install Your Tools
+
+```bash
+# Example: PyTorch
+pip install torch torchvision
+
+# Example: Verify GPU works with PyTorch
+python -c "import torch; print(torch.cuda.is_available())"
+```
+
+### Transfer Your Data
+
+```bash
+# From your local machine
+scp -P {port} my_data.zip root@{host}:/root/
+
+# Or use rsync for larger transfers
+rsync -avz -e "ssh -p {port}" ./my_project root@{host}:/root/
+```
+
+## Managing Your Rental
+
+### Stop Billing
+
+When done, go to **My Instances** and click:
+- **Stop**: Pause billing (may preserve state)
+- **Delete**: Terminate completely (all data lost)
+
+### Monitor Usage
+
+Your dashboard shows:
+- Running time
+- Cost so far
+- Remaining balance
+
+<Callout kind="tip">
+  Set up balance alerts to avoid unexpected stops when funds run low.
+</Callout>
+
+## Next Steps
+
+- Explore the [API Reference](/api-reference) for automation
+- Read about [Managing Instances](/managing-instances) for advanced control
+- Check [Troubleshooting](/help-center/troubleshooting/connection-issues) if you have issues

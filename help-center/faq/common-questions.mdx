@@ -1,0 +1,106 @@
+---
+title: Frequently Asked Questions
+description: Common questions about GPUniq GPU rental marketplace.
+---
+
+## General
+
+### What is GPUniq?
+
+GPUniq is a GPU rental marketplace that connects users who need compute power with GPU owners worldwide. Rent high-performance GPUs for AI training, machine learning, rendering, and more at competitive prices.
+
+### How is GPUniq different from AWS/GCP/Azure?
+
+GPUniq is a peer-to-peer marketplace:
+- **Lower prices**: Up to 70% cheaper than major cloud providers
+- **More GPU options**: Access to consumer and professional GPUs
+- **Flexible billing**: Per-minute, hourly, or longer-term pricing
+- **No commitments**: Rent for as little or as long as you need
+
+### What GPUs are available?
+
+The marketplace includes various NVIDIA GPUs depending on what providers have connected:
+- Consumer: RTX 3090, RTX 4090
+- Professional: A100, H100, A6000, L40S
+- And more depending on provider availability
+
+## Payments
+
+### What payment methods are supported?
+
+- **USDT (TRC20)**: Deposit and withdraw using Tether on Tron network
+- **YooKassa**: Bank cards and local methods for Russian users
+
+### How does billing work?
+
+You choose a pricing type when renting:
+- **Per minute**: Most flexible, charged every minute
+- **Per hour/day/week/month**: Discounted rates for longer commitments
+
+Your balance is deducted in real-time as you use GPU resources.
+
+### Can I withdraw my balance?
+
+Yes, you can withdraw your balance in USDT to any TRC20 wallet address.
+
+## Rentals
+
+### How do I rent a GPU?
+
+1. Browse the marketplace at [gpuniq.com](https://gpuniq.com)
+2. Filter by GPU model, VRAM, price, location
+3. Click on a GPU to see details
+4. Click "Rent Now" and choose pricing type
+5. Get instant SSH access
+
+### How do I connect to my rented GPU?
+
+Use SSH with the credentials provided in your dashboard:
+
+```bash
+ssh root@{host} -p {port}
+# Enter password from dashboard
+```
+
+### What if I can't connect?
+
+1. Verify your instance is "Running" in the dashboard
+2. Double-check the SSH host, port, and password
+3. Try stopping and starting the instance
+4. Contact support if issues persist
+
+### How do I stop being charged?
+
+Click "Stop" to pause billing (instance may be preserved) or "Delete" to terminate completely.
+
+## For Providers
+
+### How do I become a GPU provider?
+
+1. Have a machine with NVIDIA GPU(s)
+2. Install the GPUniq agent
+3. Register your agent via API with pricing
+4. Your GPU appears in the marketplace
+
+### What's the commission structure?
+
+GPUniq takes a small platform fee from each rental. Providers receive the majority of the rental price directly to their balance.
+
+### Can I control who rents my GPU?
+
+You can set maximum rental durations and force-stop problematic rentals through the provider dashboard.
+
+## Technical
+
+### Do GPUs come with CUDA installed?
+
+Most providers have CUDA pre-installed. Verify by running `nvidia-smi` after connecting.
+
+### Can I use custom Docker images?
+
+Docker image support is coming soon. Currently, you connect via SSH to the base environment.
+
+### Is my data secure?
+
+Each rental runs in an isolated container. When you delete your instance, data is removed. For sensitive workloads, ensure you delete instances after use.
+

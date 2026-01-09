@@ -1,49 +1,49 @@
 ---
-title: Introduction to GPUiq
+title: Introduction to GPUniq
 description: >-
-  Discover GPUniq, a GPU rental service offering powerful compute resources for
+  Discover GPUniq, a GPU rental marketplace offering powerful compute resources for
   AI, machine learning, 3D rendering, and crypto mining with cost savings up to
   70%.
 ---
 ## Overview
 
-GPUniq provides on-demand GPU rentals for compute-intensive workloads like AI training, machine learning inference, 3D rendering, and cryptocurrency mining. You access high-performance NVIDIA GPUs at affordable prices, with up to 70% cost savings compared to traditional cloud providers. Features like automatic switching between instances and snapshot backups make your workflows seamless and reliable.
+GPUniq provides on-demand GPU rentals for compute-intensive workloads like AI training, machine learning inference, 3D rendering, and cryptocurrency mining. You access high-performance NVIDIA GPUs at affordable prices, with up to 70% cost savings compared to traditional cloud providers. Our marketplace connects you directly with GPU owners worldwide, ensuring competitive pricing and instant availability.
 
-Scale your projects without upfront hardware investments. Whether you run large language models or render complex scenes, GPUiq delivers the power you need, when you need it.
+Scale your projects without upfront hardware investments. Whether you run large language models or render complex scenes, GPUniq delivers the power you need, when you need it.
 
 ## Key Features
 
-Explore the core capabilities that set GPUiq apart.
+Explore the core capabilities that set GPUniq apart.
 
 <Columns cols="3">
-  <Card title="Automatic Switching" href="/docs/automatic-switching" icon="zap" horizontal="false">
-    Seamlessly switch between GPU instances without downtime. Optimize costs by pausing idle resources automatically.
+  <Card title="Instant Marketplace" href="/features" icon="zap" horizontal="false">
+    Browse available GPUs in real-time. Filter by model, VRAM, location, and price. Rent instantly with SSH access.
   </Card>
 
-  <Card title="Snapshots" href="/docs/snapshots" icon="database" horizontal="false">
-    Create instant backups of your GPU state. Restore workloads in seconds for reliable experimentation.
+  <Card title="AI-Powered Recommendations" href="/features" icon="cpu" horizontal="false">
+    Get intelligent GPU suggestions based on your workload requirements using our built-in AI assistant.
   </Card>
 
-  <Card title="Cost Savings" href="/docs/pricing" icon="trending-down" horizontal="false">
-    Save up to 70% with flexible on-demand pricing. No long-term commitments required.
+  <Card title="Crypto & Fiat Payments" href="/features" icon="credit-card" horizontal="false">
+    Pay with USDT (TRC20) or traditional payment methods. Deposit and withdraw seamlessly.
   </Card>
 </Columns>
 
 <Callout kind="tip" collapsed="false">
-  Start with our free trial to test high-end GPUs like A100 or H100 without any charges.
+  Start exploring the marketplace at [gpuniq.com](https://gpuniq.com) - no commitment required to browse available GPUs.
 </Callout>
 
 ## Benefits for Your Workloads
 
-GPUiq excels in scenarios demanding massive parallel processing:
+GPUniq excels in scenarios demanding massive parallel processing:
 
-- **AI and Machine Learning**: Train models faster with multi-GPU clusters.
+- **AI and Machine Learning**: Train models faster with high-VRAM GPUs like A100, H100, and RTX 4090.
 
-- **3D Rendering**: Accelerate ray tracing and animations for creative pipelines.
+- **3D Rendering**: Accelerate ray tracing and animations for creative pipelines with professional GPUs.
 
-- **Crypto Mining**: Deploy optimized rigs with real-time monitoring.
+- **Crypto Mining**: Deploy optimized rigs with real-time monitoring and per-minute billing.
 
-You benefit from low-latency access, global data centers, and 99.9% uptime guarantees. Monitor usage via our dashboard at `https://dashboard.gpuiq.com`.
+You benefit from low-latency access, global GPU providers, and transparent pricing. Monitor usage via your dashboard at [gpuniq.com](https://gpuniq.com).
 
 ## Quick Start
 
@@ -51,32 +51,35 @@ Get up and running in minutes.
 
 <Steps>
   <Step title="Create Account" icon="user-plus" title-type="p">
-    Sign up at `https://dashboard.gpuiq.com/register` with your email.
+    Sign up at [gpuniq.com](https://gpuniq.com) with your email or Google account.
   </Step>
 
-  <Step title="Choose GPU" icon="settings" title-type="p">
-    Select from A100, RTX 4090, or custom configurations based on your needs.
+  <Step title="Add Balance" icon="wallet" title-type="p">
+    Deposit funds using USDT (TRC20) or YooKassa for Russian users.
   </Step>
 
-  <Step title="Deploy Instance" icon="rocket" title-type="p">
-    Launch with one click. Use SSH or our API for access.
+  <Step title="Browse Marketplace" icon="search" title-type="p">
+    Filter GPUs by model, VRAM, location, and hourly price. View real-time availability.
+  </Step>
+
+  <Step title="Rent & Connect" icon="rocket" title-type="p">
+    Click "Rent" on your chosen GPU. Get instant SSH access credentials.
 
     ```bash
-    curl -X POST https://api.gpuiq.com/v1/instances \
-      -H "Authorization: Bearer YOUR_API_KEY" \
-      -H "Content-Type: application/json" \
-      -d '{
-        "gpu_type": "A100",
-        "vcpus": 8,
-        "memory_gb": 40
-      }'
+    ssh root@<host> -p <port>
+    # Password provided in dashboard
     ```
   </Step>
-
-  <Step title="Run Your Workload" icon="play-circle" title-type="p">
-    Upload data, execute scripts, and scale as needed.
-  </Step>
 </Steps>
+
+## API Access
+
+Automate your GPU rentals with our REST API.
+
+```bash
+curl -X GET https://api.gpuniq.com/v1/marketplace/list \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
 
 ## Next Steps
 
@@ -85,12 +88,11 @@ Get up and running in minutes.
     Detailed setup for your first GPU rental.
   </Card>
 
-  <Card title="API Reference" href="/authentication" icon="code" horizontal="false">
-    Integrate GPUiq into your automation workflows.
+  <Card title="API Reference" href="/api-reference" icon="code" horizontal="false">
+    Integrate GPUniq into your automation workflows.
   </Card>
 </Columns>
 
 <Expandable title="Need Help?" default-open="true">
-  Visit our [help center](/help-center) or contact [support@gpuiq.com](mailto:support@gpuiq.com) for personalized assistance.
+  Visit our [help center](/help-center) or contact [support@gpuniq.com](mailto:support@gpuniq.com) for personalized assistance. Join our Telegram community for real-time support.
 </Expandable>
-

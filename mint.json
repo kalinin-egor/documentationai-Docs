@@ -1,41 +1,61 @@
 {
+  "$schema": "https://mintlify.com/schema.json",
   "name": "GPUniq Docs",
-  "colors": {
-    "primary": "#9463e3"
+  "logo": {
+    "dark": "/logo.ico",
+    "light": "/logo.ico"
   },
+  "favicon": "/logo.ico",
+  "colors": {
+    "primary": "#9463e3",
+    "light": "#b084f0",
+    "dark": "#7a4bc9",
+    "anchors": {
+      "from": "#9463e3",
+      "to": "#7a4bc9"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "Support",
+      "url": "mailto:support@gpuniq.com"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Dashboard",
+    "url": "https://gpuniq.com"
+  },
+  "tabs": [
+    {
+      "name": "API Reference",
+      "url": "api-reference"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "Telegram",
+      "icon": "telegram",
+      "url": "https://t.me/gpuniq"
+    },
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/gpuniq"
+    }
+  ],
   "navigation": [
     {
-      "group": "Documentation",
+      "group": "Getting Started",
       "pages": [
-        {
-          "group": "Getting Started",
-          "pages": [
-            "introduction",
-            "quickstart"
-          ]
-        },
-        {
-          "group": "Core Concepts",
-          "pages": [
-            "features"
-          ]
-        },
-        {
-          "group": "Guides",
-          "pages": [
-            "managing-instances"
-          ]
-        }
+        "introduction",
+        "quickstart"
       ]
     },
     {
-      "group": "API Reference",
+      "group": "Core Concepts",
       "pages": [
-        {
-          "name": "API Reference",
-          "path": "api-reference",
-          "openapi": "openapi.yaml"
-        }
+        "features",
+        "managing-instances"
       ]
     },
     {
@@ -45,13 +65,7 @@
         {
           "group": "FAQs",
           "pages": [
-            "help-center/faq/egor-kalinin"
-          ]
-        },
-        {
-          "group": "Troubleshooting",
-          "pages": [
-            "help-center/troubleshooting/connection-issues"
+            "help-center/faq/common-questions"
           ]
         },
         {
@@ -59,14 +73,31 @@
           "pages": [
             "help-center/guides/rent-your-first-gpu"
           ]
+        },
+        {
+          "group": "Troubleshooting",
+          "pages": [
+            "help-center/troubleshooting/connection-issues"
+          ]
         }
       ]
     },
     {
-      "group": "Changelog",
+      "group": "Updates",
       "pages": [
         "changelog"
       ]
     }
-  ]
+  ],
+  "footerSocials": {
+    "telegram": "https://t.me/gpuniq",
+    "github": "https://github.com/gpuniq"
+  },
+  "api": {
+    "baseUrl": "https://api.gpuniq.com",
+    "auth": {
+      "method": "bearer"
+    }
+  },
+  "openapi": "openapi.yaml"
 }

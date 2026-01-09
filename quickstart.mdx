@@ -1,5 +1,5 @@
 ---
-title: Get Started with GPUiq
+title: Get Started with GPUniq
 description: Set up your account and launch your first GPU instance in minutes to begin your compute tasks.
 ---
 
@@ -8,12 +8,12 @@ description: Set up your account and launch your first GPU instance in minutes t
 Before you begin, ensure you have:
 
 - A valid email address for account verification
-- Basic knowledge of SSH for connecting to instances (optional for dashboard access)
-- A payment method for billing GPU usage
+- Basic knowledge of SSH for connecting to instances
+- Funds for GPU rental (USDT or rubles via YooKassa)
 
 <Callout kind="info">
 
-GPUiq offers a free trial credit upon signup. No credit card required initially.
+GPUniq supports instant registration with Google OAuth for quick onboarding.
 
 </Callout>
 
@@ -23,96 +23,140 @@ Follow these steps to sign up and verify your email.
 
 <Steps>
   <Step title="Sign Up" icon="user-plus">
-    Visit [https://dashboard.example.com](https://dashboard.example.com) and click **Sign Up**.
+    Visit [gpuniq.com](https://gpuniq.com) and click **Sign Up**.
 
-    Fill in your email, password, and desired username.
+    Fill in your email, username, and password. Alternatively, use Google Sign-In for instant access.
   </Step>
   <Step title="Verify Email" icon="mail">
-    Check your inbox for a verification email from GPUiq.
+    Check your inbox for a verification code from GPUniq.
 
-    Click the verification link to activate your account.
+    Enter the 6-digit code to activate your account.
   </Step>
   <Step title="Log In" icon="log-in">
     Return to the dashboard and log in with your credentials.
 
-    You'll land on the main dashboard overview.
+    You'll land on the marketplace overview.
   </Step>
 </Steps>
 
-## Navigate the Dashboard
+## Add Funds to Your Account
 
-The GPUiq dashboard provides quick access to your instances, billing, and configurations.
+GPUniq supports multiple payment methods.
+
+<Tabs>
+  <Tab title="Crypto (USDT)" icon="bitcoin">
+    1. Go to **Balance** in your dashboard
+    2. Click **Deposit with Crypto**
+    3. Send USDT (TRC20) to the provided address
+    4. Wait for blockchain confirmation (~2-5 minutes)
+  </Tab>
+  <Tab title="YooKassa (RUB)" icon="credit-card">
+    1. Go to **Balance** in your dashboard
+    2. Enter amount in rubles
+    3. Complete payment via YooKassa
+    4. Balance updates instantly
+  </Tab>
+</Tabs>
+
+## Navigate the Marketplace
+
+The GPUniq marketplace provides access to hundreds of GPUs worldwide.
 
 <Columns cols={3}>
-  <Card title="Instances" icon="server" href="#launch-instance">
-    View, start, stop, and manage your GPU instances.
+  <Card title="Browse GPUs" icon="server" href="#launch-instance">
+    Filter by GPU model, VRAM, location, and price.
   </Card>
-  <Card title="Billing" icon="credit-card" href="/configuration">
-    Track usage, costs, and add payment methods.
+  <Card title="My Instances" icon="monitor" href="/managing-instances">
+    View and manage your active rentals.
   </Card>
-  <Card title="Snapshots" icon="save" href="/introduction">
-    Create and restore instance snapshots for easy backups.
+  <Card title="Billing" icon="credit-card" href="/features">
+    Track usage, costs, and manage payments.
   </Card>
 </Columns>
 
-## Launch Your First GPU Instance
+## Rent Your First GPU
 
 Select a powerful GPU and deploy it in seconds.
 
 <Steps>
-  <Step title="Choose GPU Type" icon="zap">
-    From the dashboard, click **New Instance**.
-
-    Select a GPU model like NVIDIA A100 or H100 based on your task (AI, rendering, mining).
+  <Step title="Filter GPUs" icon="search">
+    Use the marketplace filters:
+    - **GPU Model**: RTX 4090, A100, H100, etc.
+    - **VRAM**: Minimum/maximum GB
+    - **Price**: Hourly rate range
+    - **Location**: Geographic region
+    - **Verified**: Show only verified providers
   </Step>
-  <Step title="Configure Basics" icon="settings">
-    Set instance size, storage (`>100GB` recommended), and region closest to you.
-
-    Enable auto-scaling if needed for variable workloads.
+  <Step title="Select GPU" icon="zap">
+    Click on a GPU card to view details including:
+    - Full hardware specs (RAM, CPU, storage)
+    - Provider reliability score
+    - Available port range
   </Step>
-  <Step title="Deploy" icon="rocket">
-    Review settings and click **Launch**.
+  <Step title="Rent" icon="rocket">
+    Click **Rent Now**. Choose pricing type:
+    - Per minute (most flexible)
+    - Per hour
+    - Per day/week/month (discounts available)
 
-    Your instance is ready in under 60 seconds.
+    Your instance starts immediately.
   </Step>
 </Steps>
 
+## Connect to Your Instance
+
+Once rented, you'll receive SSH access credentials.
+
 <Tabs>
   <Tab title="SSH Connection" icon="terminal">
-    Use the provided SSH command from the dashboard.
+    Use the SSH command from your dashboard:
 
-````bash
-ssh root@{public-ip} -p 22 -i gpu-key.pem
-````
+```bash
+ssh root@<host> -p <port>
+# Enter the password shown in your dashboard
+```
   </Tab>
   <Tab title="API Launch" icon="code">
-    Launch programmatically for automation.
+    Launch programmatically for automation:
 
-<CodeGroup tabs="cURL,JavaScript">
+<CodeGroup tabs="cURL,JavaScript,Python">
 ```bash
-curl -X POST https://api.example.com/v1/instances \
+curl -X POST https://api.gpuniq.com/v1/marketplace/order \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "gpu_type": "A100",
-    "storage_gb": 200,
-    "region": "us-east"
+    "agent_id": 123,
+    "gpu_required": 1,
+    "pricing_type": "minute"
   }'
 ```
 
 ```javascript
-const response = await fetch('https://api.example.com/v1/instances', {
+const response = await fetch('https://api.gpuniq.com/v1/marketplace/order', {
   method: 'POST',
   headers: {
     'Authorization': 'Bearer YOUR_API_KEY',
     'Content-Type': 'application/json'
   },
   body: JSON.stringify({
-    gpu_type: 'A100',
-    storage_gb: 200,
-    region: 'us-east'
+    agent_id: 123,
+    gpu_required: 1,
+    pricing_type: 'minute'
   })
 });
+```
+
+```python
+import requests
+response = requests.post(
+  'https://api.gpuniq.com/v1/marketplace/order',
+  headers={'Authorization': 'Bearer YOUR_API_KEY'},
+  json={
+    'agent_id': 123,
+    'gpu_required': 1,
+    'pricing_type': 'minute'
+  }
+)
 ```
 </CodeGroup>
   </Tab>
@@ -120,42 +164,44 @@ const response = await fetch('https://api.example.com/v1/instances', {
 
 ## Basic Configuration
 
-Customize your instance post-launch.
+Common parameters when renting GPUs:
 
-<ParamField path="gpu_type" param-type="string" required="true">
-  Specifies the GPU model, e.g., `A100` or `H100`.
+<ParamField path="agent_id" param-type="integer" required="true">
+  The ID of the GPU/agent to rent (from marketplace list).
 </ParamField>
 
-<ParamField query="auto_scale" param-type="boolean" required="false">
-  Enables automatic scaling based on load (`true`/`false`).
+<ParamField path="gpu_required" param-type="integer" required="false">
+  Number of GPUs to reserve (default: all available on the machine).
 </ParamField>
 
-For AI tasks, install CUDA via SSH:
+<ParamField query="pricing_type" param-type="string" required="false">
+  Billing interval: `minute`, `hour`, `day`, `week`, or `month`.
+</ParamField>
 
-````bash
-wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb
-sudo dpkg -i cuda-keyring_1.0-1_all.deb
-sudo apt-get update
-sudo apt-get -y install cuda
-````
+For AI tasks, most GPUs come with CUDA pre-installed. Verify with:
+
+```bash
+nvidia-smi
+```
 
 <Callout kind="tip">
 
-Save your instance as a snapshot after initial setup to reuse configurations quickly, saving up to 70% on costs.
+Verified providers (indicated by a badge) have been tested for reliability and uptime.
 
 </Callout>
 
 ## Next Steps
 
-- Monitor performance in the dashboard
-- Explore advanced features like automatic switching
-- Integrate with your workflows using the API
+- Monitor your instance in the dashboard
+- Stop/resume instances to pause billing
+- Explore the API for automation
+- Connect your own GPU to earn as a provider
 
 <Columns cols={2}>
-  <Card title="API Reference" icon="book-open" href="/authentication">
-    Authenticate and manage instances via API.
+  <Card title="API Reference" icon="book-open" href="/api-reference">
+    Full API documentation for automation.
   </Card>
-  <Card title="Troubleshooting" icon="help-circle" href="/help-center">
+  <Card title="Troubleshooting" icon="help-circle" href="/help-center/troubleshooting/connection-issues">
     Common issues and solutions.
   </Card>
 </Columns>
