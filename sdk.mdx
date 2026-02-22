@@ -1,0 +1,275 @@
+---
+title: Python SDK
+description: Install and use the GPUniq Python SDK to control GPU instances, volumes, LLM models, and more programmatically.
+---
+
+## Installation
+
+```bash
+pip install GPUniq
+```
+
+Requires Python 3.8+. Only dependency: `requests`.
+
+## Initialize Client
+
+```python
+from gpuniq import GPUniq
+
+client = GPUniq(api_key="gpuniq_your_key")
+```
+
+Get your API key from **LLM API Keys** in the [dashboard](https://gpuniq.com).
+
+### Configuration
+
+```python
+client = GPUniq(
+    api_key="gpuniq_your_key",
+    base_url="https://api.gpuniq.com/v1",  # default
+    timeout=120,                            # seconds, default 60
+)
+```
+
+## Modules
+
+The SDK provides access to all platform features through module attributes:
+
+| Module | Description |
+|--------|-------------|
+| `client.marketplace` | Browse GPUs, create orders |
+| `client.gpu_cloud` | Deploy by GPU type |
+| `client.burst` | Multi-GPU burst deployments |
+| `client.instances` | Manage running instances |
+| `client.volumes` | Persistent storage |
+| `client.llm` | LLM chat completions |
+| `client.payments` | Deposits and billing history |
+| `client.settings` | SSH keys and Telegram |
+
+## Marketplace
+
+```python
+# List GPUs with filters
+gpus = client.marketplace.list(
+    gpu_model=["RTX 4090", "A100"],
+    min_vram_gb=24,
+    verified_only=True,
+    sort_by="price-low",
+    page=1,
+    page_size=20,
+)
+
+# Get marketplace statistics
+stats = client.marketplace.statistics()
+
+# Get agent details
+agent = client.marketplace.get_agent(agent_id=123)
+
+# Check availability
+avail = client.marketplace.check_availability(agent_id=123)
+
+# Create order
+order = client.marketplace.create_order(
+    agent_id=123,
+    pricing_type="hour",
+    docker_image="pytorch/pytorch:latest",
+    ssh_key_ids=[1, 2],
+    disk_gb=100,
+    volume_id=9,
+)
+
+# Async order (returns job_id for polling)
+job = client.marketplace.create_order_async(agent_id=123, pricing_type="hour")
+status = client.marketplace.get_order_status(job["job_id"])
+```
+
+## GPU Dex-Cloud
+
+```python
+# List available GPU types
+gpus = client.gpu_cloud.list_instances(search="4090")
+
+# Check pricing
+pricing = client.gpu_cloud.pricing("RTX_4090", gpu_count=2, disk_gb=100)
+
+# Deploy
+deploy = client.gpu_cloud.deploy(
+    gpu_name="RTX_4090",
+    gpu_count=1,
+    docker_image="pytorch/pytorch:latest",
+    disk_gb=100,
+    volume_id=9,
+)
+```
+
+## GPU Burst
+
+```python
+# Create burst order with fallback GPUs
+order = client.burst.create_order(
+    docker_image="pytorch/pytorch:latest",
+    primary_gpu="RTX_4090",
+    gpu_count=8,
+    extra_gpus=[
+        {"gpu_name": "RTX_3090", "max_price": 0.5},
+        {"gpu_name": "A100", "max_price": 1.2},
+    ],
+    disk_gb=200,
+)
+
+# Manage orders
+orders = client.burst.list_orders()
+client.burst.start_order(order_id=1)
+client.burst.stop_order(order_id=1)
+client.burst.delete_order(order_id=1)
+
+# Cost estimate (without creating order)
+estimate = client.burst.estimate(
+    docker_image="pytorch/pytorch:latest",
+    primary_gpu="RTX_4090",
+    gpu_count=8,
+)
+
+# Billing history
+txns = client.burst.transactions(order_id=1)
+runs = client.burst.runs(order_id=1)
+```
+
+## Instances
+
+```python
+# List active instances
+instances = client.instances.list(page=1, page_size=20)
+archived = client.instances.list_archived()
+
+# Instance details
+details = client.instances.get(task_id=456)
+
+# Lifecycle
+client.instances.start(task_id=456)
+client.instances.stop(task_id=456)
+client.instances.delete(task_id=456)
+
+# Rename
+client.instances.rename(task_id=456, name="my-training-run")
+
+# Logs and SLA
+logs = client.instances.logs(task_id=456)
+sla = client.instances.sla(task_id=456)
+
+# SSH keys per instance
+client.instances.attach_ssh_key(task_id=456, ssh_key_id=1)
+client.instances.detach_ssh_key(task_id=456, key_id=1)
+```
+
+## Volumes
+
+```python
+# Create
+vol = client.volumes.create(name="my-dataset", size_limit_gb=50)
+
+# List
+volumes = client.volumes.list()
+
+# Upload / download files
+client.volumes.upload(volume_id=1, file_path="/local/data.tar.gz", subpath="datasets/")
+files = client.volumes.list_files(volume_id=1, subpath="datasets/")
+client.volumes.download_to(
+    volume_id=1,
+    remote_path="datasets/data.tar.gz",
+    local_path="./data.tar.gz",
+)
+
+# Delete
+client.volumes.delete_file(volume_id=1, path="datasets/old.tar.gz")
+client.volumes.delete(volume_id=1)
+```
+
+## LLM
+
+```python
+# Simple chat
+response = client.llm.chat("openai/gpt-oss-120b", "Explain transformers")
+print(response)
+
+# Full chat completion with history
+data = client.llm.chat_completion(
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Hello!"},
+    ],
+    model="openai/gpt-oss-120b",
+    temperature=0.7,
+    max_tokens=1000,
+)
+
+# Token balance and models
+balance = client.llm.balance()
+models = client.llm.models()
+
+# Persistent chat sessions
+session = client.llm.create_chat_session(model="openai/gpt-oss-120b", title="Research")
+reply = client.llm.send_message(chat_id=session["id"], message="Hello!")
+```
+
+## Payments
+
+```python
+# Deposit
+deposit = client.payments.deposit(amount=1000, payment_system="yookassa")
+print(deposit["confirmation_url"])
+
+# History
+history = client.payments.history()
+spending = client.payments.spending_history()
+```
+
+## Settings
+
+```python
+# SSH keys
+keys = client.settings.list_ssh_keys()
+new_key = client.settings.create_ssh_key(key_name="laptop", public_key="ssh-rsa AAAA...")
+client.settings.delete_ssh_key(key_id=1)
+
+# Telegram notifications
+client.settings.link_telegram(telegram_username="myuser")
+```
+
+## Error Handling
+
+```python
+from gpuniq import (
+    GPUniq,
+    GPUniqError,
+    AuthenticationError,
+    RateLimitError,
+    NotFoundError,
+)
+
+client = GPUniq(api_key="gpuniq_your_key")
+
+try:
+    instances = client.instances.list()
+except AuthenticationError:
+    print("Invalid API key")
+except RateLimitError as e:
+    print(f"Rate limited, retry after {e.retry_after}s")
+except NotFoundError:
+    print("Resource not found")
+except GPUniqError as e:
+    print(f"Error: {e.message} (code={e.error_code}, status={e.http_status})")
+```
+
+The SDK automatically retries on rate limit (429) up to 3 times with `Retry-After` backoff.
+
+## Backward Compatibility
+
+v1.x code continues to work:
+
+```python
+import gpuniq
+
+client = gpuniq.init("gpuniq_your_key")
+response = client.request("openai/gpt-oss-120b", "Hello!")
+```

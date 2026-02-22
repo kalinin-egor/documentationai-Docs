@@ -1,0 +1,183 @@
+---
+title: GPU Dex-Cloud
+description: Deploy GPU instances by type — pick a GPU model, click deploy, and the platform finds the best available server automatically.
+---
+
+## Overview
+
+GPU Dex-Cloud is the simplest way to deploy GPU instances. Tell GPUniq which GPU type you want and how many — the platform automatically finds the best available machine, provisions it, and returns a ready instance.
+
+No need to browse individual servers. Pick a GPU type, set your configuration, and deploy.
+
+**Best for:** Quick experiments, prototyping, and deployments where you don't need to pick a specific server.
+
+## How It Works
+
+```mermaid
+graph LR
+    A[Select GPU Type] --> B[Set Configuration]
+    B --> C[GPUniq Finds Best Server]
+    C --> D[Instance Deployed]
+    D --> E[SSH Access Ready]
+```
+
+1. Choose a GPU type (e.g., RTX 4090)
+2. Set GPU count, disk size, and Docker image
+3. GPUniq finds the best available server across all providers
+4. Your instance is deployed and ready for SSH access
+
+## List Available GPU Types
+
+See which GPU types are available and their pricing.
+
+<CodeGroup>
+```python Python SDK
+from gpuniq import GPUniq
+client = GPUniq(api_key="gpuniq_your_key")
+
+gpus = client.gpu_cloud.list_instances()
+
+for gpu in gpus["featured"]:
+    print(f"{gpu['gpu_name']}: {gpu['available_count']} available")
+    print(f"  ${gpu['gpu_price_per_gpu_hour_usd']}/GPU/hr")
+    print(f"  VRAM: {gpu['vram_gb']}GB, RAM: {gpu['ram_gb']}GB")
+```
+
+```bash cURL
+curl "https://api.gpuniq.com/v1/gpu-cloud/instances" \
+  -H "X-API-Key: gpuniq_your_key"
+```
+</CodeGroup>
+
+### Search by GPU Name
+
+```python
+# Find 4090 instances
+gpus = client.gpu_cloud.list_instances(search="4090")
+
+# Filter by specs
+gpus = client.gpu_cloud.list_instances(
+    min_gpu_count=2,
+    min_vram_gb=24,
+    min_ram_gb=32,
+)
+```
+
+### Filter Parameters
+
+<ParamField query="search" type="string">
+  Search by GPU name (e.g., "4090", "A100").
+</ParamField>
+
+<ParamField query="secure_cloud" type="boolean" default="false">
+  Only show secure cloud instances.
+</ParamField>
+
+<ParamField query="min_gpu_count" type="integer">
+  Minimum GPU count.
+</ParamField>
+
+<ParamField query="min_vram_gb" type="number">
+  Minimum VRAM per GPU.
+</ParamField>
+
+<ParamField query="min_ram_gb" type="number">
+  Minimum system RAM.
+</ParamField>
+
+## Check Pricing
+
+Get detailed pricing for a specific GPU configuration before deploying.
+
+```python
+pricing = client.gpu_cloud.pricing(
+    "RTX_4090",
+    gpu_count=2,
+    disk_gb=100,
+    secure_cloud=False,
+)
+print(f"Total: ${pricing['total_price_per_hour']}/hr")
+```
+
+## Deploy
+
+Deploy a GPU instance with a single call.
+
+<CodeGroup>
+```python Python SDK
+deploy = client.gpu_cloud.deploy(
+    gpu_name="RTX_4090",
+    gpu_count=1,
+    docker_image="pytorch/pytorch:latest",
+    disk_gb=100,
+    volume_id=9,           # optional: attach persistent storage
+    secure_cloud=False,
+)
+
+print(f"Job ID: {deploy['job_id']}")
+```
+
+```bash cURL
+curl -X POST "https://api.gpuniq.com/v1/gpu-cloud/deploy" \
+  -H "X-API-Key: gpuniq_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gpu_name": "RTX_4090",
+    "gpu_count": 1,
+    "docker_image": "pytorch/pytorch:latest",
+    "disk_gb": 100
+  }'
+```
+</CodeGroup>
+
+### Deploy Parameters
+
+<ParamField body="gpu_name" type="string" required>
+  GPU type to deploy (e.g., `RTX_4090`, `A100`, `H100`).
+</ParamField>
+
+<ParamField body="gpu_count" type="integer" default="1">
+  Number of GPUs (1-8).
+</ParamField>
+
+<ParamField body="docker_image" type="string" default="vastai/pytorch:cuda-12.9.1-auto">
+  Docker image to use.
+</ParamField>
+
+<ParamField body="disk_gb" type="integer" default="50">
+  Disk size in GB (20-2048).
+</ParamField>
+
+<ParamField body="volume_id" type="integer">
+  Persistent volume to attach.
+</ParamField>
+
+<ParamField body="secure_cloud" type="boolean" default="false">
+  Deploy on secure cloud infrastructure.
+</ParamField>
+
+## After Deployment
+
+Once deployed, manage your instance through the [Instances](/managing-instances) module:
+
+```python
+# Check your instances
+instances = client.instances.list()
+
+# Get SSH credentials
+details = client.instances.get(task_id=456)
+
+# Stop / start / delete
+client.instances.stop(task_id=456)
+client.instances.start(task_id=456)
+client.instances.delete(task_id=456)
+```
+
+## Marketplace vs Dex-Cloud
+
+| | Marketplace | Dex-Cloud |
+|---|---|---|
+| **Control** | Pick exact server | Platform picks for you |
+| **Speed** | Browse, compare, then rent | One API call |
+| **Filters** | 15+ filter options | GPU type + count |
+| **Best for** | Specific hardware needs | Quick deployments |

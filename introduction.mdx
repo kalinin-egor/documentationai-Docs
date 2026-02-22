@@ -1,98 +1,109 @@
 ---
 title: Introduction to GPUniq
-description: >-
-  Discover GPUniq, a GPU rental marketplace offering powerful compute resources for
-  AI, machine learning, 3D rendering, and crypto mining with cost savings up to
-  70%.
+description: GPU Meta-Cloud platform — rent GPUs, deploy containers, manage persistent storage, and access LLM models through a unified API and Python SDK.
 ---
+
 ## Overview
 
-GPUniq provides on-demand GPU rentals for compute-intensive workloads like AI training, machine learning inference, 3D rendering, and cryptocurrency mining. You access high-performance NVIDIA GPUs at affordable prices, with up to 70% cost savings compared to traditional cloud providers. Our marketplace connects you directly with GPU owners worldwide, ensuring competitive pricing and instant availability.
+GPUniq is a GPU Meta-Cloud platform that aggregates compute capacity from multiple providers worldwide. Access thousands of GPUs through three deployment modes, manage persistent storage volumes, and use LLM models — all through a single API and Python SDK.
 
-Scale your projects without upfront hardware investments. Whether you run large language models or render complex scenes, GPUniq delivers the power you need, when you need it.
+Save up to 70% compared to traditional cloud providers. No upfront commitments, pay only for what you use.
 
-## Key Features
+## GPU Compute
 
-Explore the core capabilities that set GPUniq apart.
+GPUniq offers three ways to rent GPU compute, each suited for different use cases.
 
 <Columns cols="3">
-  <Card title="Instant Marketplace" href="/features" icon="zap" horizontal="false">
-    Browse available GPUs in real-time. Filter by model, VRAM, location, and price. Rent instantly with SSH access.
+  <Card title="GPU Marketplace" href="/gpu-marketplace" icon="store">
+    Browse 5000+ GPU servers. Pick the exact machine, compare specs, and rent with full control.
   </Card>
 
-  <Card title="AI-Powered Recommendations" href="/features" icon="cpu" horizontal="false">
-    Get intelligent GPU suggestions based on your workload requirements using our built-in AI assistant.
+  <Card title="GPU Dex-Cloud" href="/gpu-dex-cloud" icon="cloud">
+    Deploy by GPU type. Pick a model, click deploy — the platform finds the best server automatically.
   </Card>
 
-  <Card title="Crypto & Fiat Payments" href="/features" icon="credit-card" horizontal="false">
-    Pay with USDT (TRC20) or traditional payment methods. Deposit and withdraw seamlessly.
+  <Card title="GPU Burst" href="/gpu-burst" icon="bolt">
+    Scale to 100 GPUs with automatic fallback. Best for distributed training and batch inference.
   </Card>
 </Columns>
 
-<Callout kind="tip" collapsed="false">
-  Start exploring the marketplace at [gpuniq.com](https://gpuniq.com) - no commitment required to browse available GPUs.
-</Callout>
+## Platform Features
 
-## Benefits for Your Workloads
+<Columns cols="3">
+  <Card title="Persistent Volumes" href="/volumes" icon="hard-drive">
+    Storage that survives instance restarts. Upload data, attach to any instance.
+  </Card>
 
-GPUniq excels in scenarios demanding massive parallel processing:
+  <Card title="LLM API" href="/llm" icon="message-square">
+    Access OpenAI, Qwen, DeepSeek, Llama, and other models through a unified API.
+  </Card>
 
-- **AI and Machine Learning**: Train models faster with high-VRAM GPUs like A100, H100, and RTX 4090.
-
-- **3D Rendering**: Accelerate ray tracing and animations for creative pipelines with professional GPUs.
-
-- **Crypto Mining**: Deploy optimized rigs with real-time monitoring and per-minute billing.
-
-You benefit from low-latency access, global GPU providers, and transparent pricing. Monitor usage via your dashboard at [gpuniq.com](https://gpuniq.com).
+  <Card title="Python SDK" href="/sdk" icon="code">
+    Full-featured Python SDK. `pip install GPUniq` and control everything programmatically.
+  </Card>
+</Columns>
 
 ## Quick Start
 
-Get up and running in minutes.
-
 <Steps>
-  <Step title="Create Account" icon="user-plus" title-type="p">
-    Sign up at [gpuniq.com](https://gpuniq.com) with your email or Google account.
+  <Step title="Create Account">
+    Sign up at [gpuniq.com](https://gpuniq.com) with email or Google account.
   </Step>
 
-  <Step title="Add Balance" icon="wallet" title-type="p">
-    Deposit funds using USDT (TRC20) or YooKassa for Russian users.
+  <Step title="Get API Key">
+    Go to **LLM API Keys** in your dashboard and create a key. It starts with `gpuniq_`.
   </Step>
 
-  <Step title="Browse Marketplace" icon="search" title-type="p">
-    Filter GPUs by model, VRAM, location, and hourly price. View real-time availability.
-  </Step>
-
-  <Step title="Rent & Connect" icon="rocket" title-type="p">
-    Click "Rent" on your chosen GPU. Get instant SSH access credentials.
-
+  <Step title="Install SDK">
     ```bash
-    ssh root@<host> -p <port>
-    # Password provided in dashboard
+    pip install GPUniq
+    ```
+  </Step>
+
+  <Step title="Deploy a GPU">
+    ```python
+    from gpuniq import GPUniq
+
+    client = GPUniq(api_key="gpuniq_your_key")
+
+    # Deploy an RTX 4090 instance
+    deploy = client.gpu_cloud.deploy(
+        gpu_name="RTX_4090",
+        docker_image="pytorch/pytorch:latest",
+    )
     ```
   </Step>
 </Steps>
 
-## API Access
+## Authentication
 
-Automate your GPU rentals with our REST API.
+GPUniq supports two authentication methods:
 
-```bash
-curl -X GET https://api.gpuniq.com/v1/marketplace/list \
-  -H "Authorization: Bearer YOUR_API_KEY"
+- **API Key** (recommended for SDK and automation): Pass via `X-API-Key` header
+- **JWT Token** (web dashboard): Pass via `Authorization: Bearer` header
+
+<CodeGroup>
+```python Python SDK
+from gpuniq import GPUniq
+client = GPUniq(api_key="gpuniq_your_key")
 ```
+
+```bash cURL
+curl https://api.gpuniq.com/v1/marketplace/list \
+  -H "X-API-Key: gpuniq_your_key"
+```
+</CodeGroup>
+
+Rate limit: **120 requests/minute** per API key. The SDK retries automatically on rate limit.
 
 ## Next Steps
 
 <Columns cols="2">
-  <Card title="Quickstart Guide" href="/quickstart" icon="book-open" horizontal="false">
-    Detailed setup for your first GPU rental.
+  <Card title="Quickstart Guide" href="/quickstart" icon="rocket">
+    Step-by-step account setup and first GPU rental.
   </Card>
 
-  <Card title="API Reference" href="/api-reference" icon="code" horizontal="false">
-    Integrate GPUniq into your automation workflows.
+  <Card title="Python SDK" href="/sdk" icon="code">
+    Install the SDK and start building.
   </Card>
 </Columns>
-
-<Expandable title="Need Help?" default-open="true">
-  Visit our [help center](/help-center) or contact [support@gpuniq.com](mailto:support@gpuniq.com) for personalized assistance. Join our Telegram community for real-time support.
-</Expandable>

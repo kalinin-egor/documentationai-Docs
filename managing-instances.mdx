@@ -1,156 +1,45 @@
 ---
-title: Managing GPU Instances
-description: Learn how to create, monitor, and control your GPU rentals on GPUniq.
+title: Managing Instances
+description: Create, monitor, and control your GPU instances — start, stop, delete, view logs, check SLA, and manage SSH keys.
 ---
 
-## Creating Rentals
+## Overview
 
-Rent GPU instances through the GPUniq marketplace or API based on your compute needs.
+All GPU deployment modes (Marketplace, Dex-Cloud, Burst) create instances. Once created, manage them through a unified interface.
 
-<Steps>
-  <Step title="Browse Marketplace" icon="search">
-    Navigate to [gpuniq.com](https://gpuniq.com) and browse available GPUs.
-  </Step>
-  <Step title="Select GPU" icon="zap">
-    Click on a GPU card to view full specifications:
-    - GPU model and VRAM
-    - Total RAM and CPU cores
-    - Storage capacity
-    - Location and provider reliability
-  </Step>
-  <Step title="Choose Pricing" icon="dollar-sign">
-    Select billing type: per minute, hour, day, week, or month.
-  </Step>
-  <Step title="Rent" icon="rocket">
-    Click "Rent Now" - your instance starts within seconds.
-  </Step>
-</Steps>
+## List Instances
 
-## API-Based Rental
+<CodeGroup>
+```python Python SDK
+from gpuniq import GPUniq
+client = GPUniq(api_key="gpuniq_your_key")
 
-Create rentals programmatically for automation workflows.
+# Active instances
+instances = client.instances.list(page=1, page_size=20)
+for inst in instances["instances"]:
+    print(f"Task {inst['task_id']}: {inst['status']} — {inst['gpu_model']}")
 
-<CodeGroup tabs="cURL,JavaScript,Python">
-```bash
-curl -X POST https://api.gpuniq.com/v1/marketplace/order \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agent_id": 123,
-    "gpu_required": 1,
-    "pricing_type": "hour"
-  }'
+# Archived (deleted) instances
+archived = client.instances.list_archived()
 ```
-```javascript
-const response = await fetch('https://api.gpuniq.com/v1/marketplace/order', {
-  method: 'POST',
-  headers: { 
-    'Authorization': `Bearer ${YOUR_API_KEY}`, 
-    'Content-Type': 'application/json' 
-  },
-  body: JSON.stringify({
-    agent_id: 123,
-    gpu_required: 1,
-    pricing_type: 'hour'
-  })
-});
-const result = await response.json();
-console.log(result.data.task_id);
-```
-```python
-import requests
-response = requests.post(
-  'https://api.gpuniq.com/v1/marketplace/order',
-  headers={'Authorization': 'Bearer YOUR_API_KEY', 'Content-Type': 'application/json'},
-  json={
-    'agent_id': 123,
-    'gpu_required': 1,
-    'pricing_type': 'hour'
-  }
-)
-result = response.json()
-print(result['data']['task_id'])
+
+```bash cURL
+curl "https://api.gpuniq.com/v1/instances/my?page=1&page_size=20" \
+  -H "X-API-Key: gpuniq_your_key"
 ```
 </CodeGroup>
 
-### Async Order Creation
+## Instance Details
 
-For better reliability, use the async order endpoint which returns a job ID for polling:
+Get full information about a specific instance:
 
-```bash
-# Create order asynchronously
-curl -X POST https://api.gpuniq.com/v1/marketplace/order/async \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"agent_id": 123}'
-
-# Poll for status
-curl https://api.gpuniq.com/v1/marketplace/order/status/{job_id} \
-  -H "Authorization: Bearer YOUR_API_KEY"
+```python
+details = client.instances.get(task_id=456)
 ```
 
-<Callout kind="tip">
-  Use async orders for production systems to handle network timeouts gracefully.
-</Callout>
-
-## Viewing Your Instances
-
-Access your active rentals through the dashboard or API.
-
-<Tabs>
-  <Tab title="Dashboard" icon="monitor">
-    Go to **My Instances** in your dashboard to see:
-    - Active rentals with SSH credentials
-    - Running time and cost
-    - GPU utilization metrics
-    - Quick actions (stop, delete)
-  </Tab>
-  <Tab title="API" icon="code">
-    List your instances programmatically:
-
-```bash
-curl https://api.gpuniq.com/v1/instances/my \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-Response:
-```json
-{
-  "data": {
-    "items": [
-      {
-        "task_id": 456,
-        "agent_id": 123,
-        "status": "running",
-        "ssh_host": "203.0.113.50",
-        "ssh_port": 22001,
-        "ssh_password": "generated_password",
-        "started_at": "2026-01-09T10:30:00Z",
-        "hourly_cost": 0.45
-      }
-    ],
-    "total": 1
-  }
-}
-```
-  </Tab>
-</Tabs>
+Returns SSH connection details, hardware specs, billing info, and status.
 
 ## Instance Lifecycle
-
-Control your instances efficiently to manage costs.
-
-<Columns cols={3}>
-  <Card title="Start" icon="play" href="#start-instance">
-    Resume a stopped instance.
-  </Card>
-  <Card title="Stop" icon="pause" href="#stop-instance">
-    Pause billing while preserving state.
-  </Card>
-  <Card title="Delete" icon="trash-2" href="#delete-instance">
-    Permanently terminate the rental.
-  </Card>
-</Columns>
 
 ```mermaid
 graph TD
@@ -164,117 +53,123 @@ graph TD
     F --> G[Terminated]
 ```
 
-### Stop Instance
-
-Pause your rental to stop billing. The instance state may or may not be preserved depending on the provider.
-
-<CodeGroup tabs="cURL,Python">
-```bash
-curl -X POST https://api.gpuniq.com/v1/instances/{task_id}/stop \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-```python
-requests.post(
-  f'https://api.gpuniq.com/v1/instances/{task_id}/stop',
-  headers={'Authorization': 'Bearer YOUR_API_KEY'}
-)
-```
-</CodeGroup>
-
-### Start Instance
+### Start
 
 Resume a stopped instance:
 
-```bash
-curl -X POST https://api.gpuniq.com/v1/instances/{task_id}/start \
-  -H "Authorization: Bearer YOUR_API_KEY"
+<CodeGroup>
+```python Python SDK
+client.instances.start(task_id=456)
 ```
 
-### Delete Instance
+```bash cURL
+curl -X POST "https://api.gpuniq.com/v1/instances/456/start" \
+  -H "X-API-Key: gpuniq_your_key"
+```
+</CodeGroup>
 
-Permanently terminate a rental:
+### Stop
 
-```bash
-curl -X DELETE https://api.gpuniq.com/v1/instances/{task_id} \
-  -H "Authorization: Bearer YOUR_API_KEY"
+Pause billing while preserving instance state:
+
+```python
+client.instances.stop(task_id=456)
+```
+
+### Delete
+
+Permanently terminate the rental:
+
+```python
+client.instances.delete(task_id=456)
 ```
 
 <Callout kind="warning">
-  Deleting an instance is irreversible. All data on the instance will be lost.
+  Deleting an instance is irreversible. All data on the instance will be lost. Use [Volumes](/volumes) for persistent data.
 </Callout>
 
-## Connecting to Your Instance
+### Rename
 
-After renting, you receive SSH access credentials.
-
-### SSH Connection
-
-```bash
-ssh root@{ssh_host} -p {ssh_port}
-# Enter the password from your dashboard
+```python
+client.instances.rename(task_id=456, name="bert-finetuning-v2")
 ```
 
-### Using SSH Keys
+## Connecting via SSH
 
-For passwordless access, add your public key after first login:
-
-```bash
-# On your local machine
-cat ~/.ssh/id_rsa.pub | pbcopy
-
-# On the rented GPU
-mkdir -p ~/.ssh
-echo "YOUR_PUBLIC_KEY" >> ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
-```
-
-## Instance Details
-
-Get detailed information about a specific rental:
+After creating an instance, SSH credentials are available in the dashboard:
 
 ```bash
-curl https://api.gpuniq.com/v1/instances/{task_id} \
-  -H "Authorization: Bearer YOUR_API_KEY"
+ssh root@<host> -p <port>
+# Password shown in dashboard
 ```
 
-Response includes:
-- SSH connection details
-- Container information
-- Start time and duration
-- Cost breakdown
-- GPU utilization (if available)
+### SSH Key Authentication
 
-## Task History
+For passwordless access, add SSH keys before creating the instance:
 
-View your rental history and statistics:
+```python
+# Add key in settings
+key = client.settings.create_ssh_key(
+    key_name="my-laptop",
+    public_key="ssh-ed25519 AAAA... user@laptop",
+)
 
-<Tabs>
-  <Tab title="Completed Tasks" icon="check-circle">
-```bash
-curl https://api.gpuniq.com/v1/task-history/completed?days=30 \
-  -H "Authorization: Bearer YOUR_API_KEY"
+# Pass when creating the order
+order = client.marketplace.create_order(
+    agent_id=123,
+    pricing_type="hour",
+    ssh_key_ids=[key["id"]],
+)
 ```
-  </Tab>
-  <Tab title="Statistics" icon="bar-chart">
-```bash
-curl https://api.gpuniq.com/v1/task-history/user/{user_id}/statistics \
-  -H "Authorization: Bearer YOUR_API_KEY"
+
+### Manage Instance SSH Keys
+
+```python
+# List keys attached to instance
+keys = client.instances.ssh_keys(task_id=456)
+
+# Attach / detach
+client.instances.attach_ssh_key(task_id=456, ssh_key_id=1)
+client.instances.detach_ssh_key(task_id=456, key_id=1)
 ```
-  </Tab>
-</Tabs>
+
+## Container Logs
+
+View Docker container logs for your instance:
+
+```python
+logs = client.instances.logs(task_id=456)
+```
+
+## SLA Monitoring
+
+Check uptime and availability data:
+
+```python
+sla = client.instances.sla(task_id=456)
+```
+
+Returns 24-hour and 7-day uptime segments and percentages.
+
+## Pending Jobs
+
+Track deployment jobs that haven't completed yet:
+
+```python
+jobs = client.instances.list_pending_jobs()
+
+# Cancel a pending job
+client.instances.cancel_pending_job(job_id="abc-123")
+```
 
 ## Best Practices
 
 <Expandable title="Cost Optimization Tips" default-open="true">
 
-1. **Use per-minute billing** for short experiments and testing
-2. **Commit to longer periods** for production workloads (20-40% savings)
-3. **Stop instances** when not in use instead of keeping them running
-4. **Monitor utilization** - if GPU usage is low, consider a cheaper option
-5. **Use verified providers** for critical workloads to ensure reliability
+1. **Stop instances** when not in use — billing pauses immediately
+2. **Use longer pricing types** for production workloads (20-40% savings)
+3. **Attach volumes** for persistent data instead of relying on instance storage
+4. **Monitor SLA** for critical workloads to track uptime
+5. **Use verified providers** for maximum reliability
 
 </Expandable>
-
-<Callout kind="info">
-  Your balance is deducted in real-time. Ensure sufficient funds before starting long-running jobs.
-</Callout>

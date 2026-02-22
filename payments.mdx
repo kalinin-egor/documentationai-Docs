@@ -1,0 +1,76 @@
+---
+title: Payments
+description: Deposit funds, view payment history, and track spending across all GPU rentals.
+---
+
+## Overview
+
+GPUniq supports multiple payment methods for depositing funds. Your balance is used for GPU rentals, volume storage, and LLM tokens.
+
+## Deposit Methods
+
+<Columns cols="3">
+  <Card title="USDT (TRC20)" icon="bitcoin">
+    Deposit with Tether on Tron network. Low fees, fast confirmation (~2-5 min).
+  </Card>
+  <Card title="Stripe" icon="credit-card">
+    Pay with international bank cards via Stripe.
+  </Card>
+  <Card title="YooKassa" icon="credit-card">
+    Russian bank cards and local payment methods.
+  </Card>
+</Columns>
+
+## Create a Deposit
+
+<CodeGroup>
+```python Python SDK (YooKassa)
+from gpuniq import GPUniq
+client = GPUniq(api_key="gpuniq_your_key")
+
+deposit = client.payments.deposit(amount=1000, payment_system="yookassa")
+print(f"Pay here: {deposit['confirmation_url']}")
+```
+
+```python Python SDK (Stripe)
+intent = client.payments.create_stripe_intent(amount=1000)
+print(f"Payment ID: {intent['payment_id']}")
+```
+
+```bash cURL
+curl -X POST "https://api.gpuniq.com/v1/payments/deposit" \
+  -H "X-API-Key: gpuniq_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"amount": 1000, "payment_system": "yookassa"}'
+```
+</CodeGroup>
+
+## Payment History
+
+View all deposits:
+
+```python
+history = client.payments.history()
+for invoice in history["invoices"]:
+    print(f"{invoice['amount']} — {invoice['status']}")
+```
+
+## Spending History
+
+Track spending by task:
+
+```python
+spending = client.payments.spending_history()
+for record in spending["records"]:
+    print(f"Task {record['task_id']}: {record['gpu_name']} — ${record['total_amount']}")
+```
+
+## Billing
+
+- **Real-time**: Balance is deducted as you use GPU resources
+- **Prepayment**: Depending on pricing type, 1 hour upfront may be charged
+- **Auto-stop**: Instances stop if balance reaches zero
+
+<Callout kind="info">
+  Ensure sufficient balance before starting long-running jobs. Monitor spending via the dashboard or API.
+</Callout>

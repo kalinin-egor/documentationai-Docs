@@ -1,0 +1,86 @@
+---
+title: Settings
+description: Manage SSH keys for passwordless access and configure Telegram notifications.
+---
+
+## SSH Keys
+
+Manage SSH public keys for passwordless access to GPU instances. Add your keys once and attach them to any instance at creation time.
+
+### List Keys
+
+<CodeGroup>
+```python Python SDK
+from gpuniq import GPUniq
+client = GPUniq(api_key="gpuniq_your_key")
+
+keys = client.settings.list_ssh_keys()
+for key in keys["ssh_keys"]:
+    print(f"{key['id']}: {key['key_name']} — {'active' if key['is_active'] else 'disabled'}")
+```
+
+```bash cURL
+curl "https://api.gpuniq.com/v1/settings/ssh-keys" \
+  -H "X-API-Key: gpuniq_your_key"
+```
+</CodeGroup>
+
+### Add a Key
+
+```python
+new_key = client.settings.create_ssh_key(
+    key_name="my-laptop",
+    public_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5... user@laptop",
+)
+print(f"Key ID: {new_key['id']}")
+```
+
+### Update, Toggle, Delete
+
+```python
+# Rename
+client.settings.update_ssh_key(key_id=1, key_name="work-laptop")
+
+# Disable / enable
+client.settings.toggle_ssh_key(key_id=1, is_active=False)
+client.settings.toggle_ssh_key(key_id=1, is_active=True)
+
+# Delete
+client.settings.delete_ssh_key(key_id=1)
+```
+
+### Using SSH Keys with Instances
+
+Pass `ssh_key_ids` when creating marketplace orders:
+
+```python
+order = client.marketplace.create_order(
+    agent_id=123,
+    pricing_type="hour",
+    ssh_key_ids=[1, 2],
+)
+```
+
+Or attach keys to existing instances:
+
+```python
+client.instances.attach_ssh_key(task_id=456, ssh_key_id=1)
+client.instances.detach_ssh_key(task_id=456, key_id=1)
+```
+
+## Telegram Notifications
+
+Link your Telegram account to receive notifications about instance status changes and billing alerts.
+
+### Link Account
+
+```python
+client.settings.link_telegram(telegram_username="myuser")
+```
+
+### Check Status
+
+```python
+status = client.settings.telegram_status()
+print(f"Linked: {status.get('is_linked', False)}")
+```

@@ -1,0 +1,153 @@
+---
+title: LLM API
+description: Access OpenAI, Qwen, DeepSeek, Llama, and other language models through a unified API.
+---
+
+## Overview
+
+GPUniq provides access to multiple LLM providers through a single unified API. Send chat completion requests, manage token balance, and maintain persistent chat sessions.
+
+## Available Models
+
+```python
+from gpuniq import GPUniq
+client = GPUniq(api_key="gpuniq_your_key")
+
+models = client.llm.models()
+for model in models["models"]:
+    print(model)
+```
+
+Models include providers like OpenAI, Qwen, DeepSeek, Meta Llama, Mistral, NVIDIA, and more. The list updates dynamically as new models become available.
+
+## Simple Chat
+
+Send a message and get a response string:
+
+<CodeGroup>
+```python Python SDK
+response = client.llm.chat("openai/gpt-oss-120b", "Explain how transformers work")
+print(response)
+```
+
+```bash cURL
+curl -X POST "https://api.gpuniq.com/v1/llm/chat/completions" \
+  -H "X-API-Key: gpuniq_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [{"role": "user", "content": "Explain how transformers work"}],
+    "model": "openai/gpt-oss-120b"
+  }'
+```
+</CodeGroup>
+
+## Chat Completion (Full)
+
+Send a full message history with parameters:
+
+```python
+data = client.llm.chat_completion(
+    messages=[
+        {"role": "system", "content": "You are a helpful AI assistant."},
+        {"role": "user", "content": "What is gradient descent?"},
+    ],
+    model="openai/gpt-oss-120b",
+    temperature=0.7,
+    max_tokens=1000,
+    top_p=0.9,
+)
+
+print(data["content"])
+```
+
+### Parameters
+
+<ParamField body="messages" type="object[]" required>
+  List of message objects with `role` ("system", "user", "assistant") and `content`.
+</ParamField>
+
+<ParamField body="model" type="string">
+  Model identifier (e.g., `openai/gpt-oss-120b`).
+</ParamField>
+
+<ParamField body="max_tokens" type="integer">
+  Maximum tokens in the response.
+</ParamField>
+
+<ParamField body="temperature" type="number">
+  Sampling temperature (0.0-2.0). Higher = more creative.
+</ParamField>
+
+<ParamField body="top_p" type="number">
+  Top-p nucleus sampling parameter.
+</ParamField>
+
+## Token Balance
+
+Check your remaining LLM tokens:
+
+```python
+balance = client.llm.balance()
+print(f"Remaining: {balance['tokens_remaining']:,} tokens")
+```
+
+## Purchase Tokens
+
+```python
+# Buy a package
+client.llm.purchase_tokens(package_type="medium")  # small, medium, large
+
+# Or convert rubles to tokens
+client.llm.convert_rubles_to_tokens(ruble_amount=100, tokens_to_add=50000)
+
+# View available packages
+packages = client.llm.packages()
+```
+
+## Usage History
+
+```python
+history = client.llm.usage_history(limit=50, offset=0)
+```
+
+## Chat Sessions
+
+Maintain persistent conversations:
+
+```python
+# Create a session
+session = client.llm.create_chat_session(
+    model="openai/gpt-oss-120b",
+    title="Research Assistant",
+)
+
+# Send messages within the session
+reply = client.llm.send_message(
+    chat_id=session["id"],
+    message="What are the key papers on attention mechanisms?",
+    temperature=0.5,
+)
+
+# List all sessions
+sessions = client.llm.list_chat_sessions(limit=50)
+
+# Get a session with full message history
+full = client.llm.get_chat_session(chat_id=session["id"])
+
+# Update title
+client.llm.update_chat_session(chat_id=session["id"], title="New Title")
+
+# Delete
+client.llm.delete_chat_session(chat_id=session["id"])
+```
+
+## Generate Terminal Commands
+
+Convert natural language to terminal commands:
+
+```python
+cmds = client.llm.generate_commands(
+    prompt="find all Python files larger than 1MB and sort by size",
+    max_commands=5,
+)
+```

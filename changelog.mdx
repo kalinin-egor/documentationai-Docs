@@ -1,36 +1,71 @@
 ---
 title: Changelog
-description: Track the latest updates and improvements to GPUniq, including new features and bug fixes.
+description: Track the latest updates and improvements to GPUniq.
 ---
 
-## Recent Releases
-
-Stay informed about GPUniq's evolution. Review changes below to understand new capabilities for your AI training, rendering, or mining workloads.
-
 <Callout kind="info">
-  Follow us on Telegram for real-time announcements and community discussions.
+  Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
+
+<Update label="2026-02-23" description="v2.0.0" tags={["feature", "sdk", "api"]}>
+
+## Python SDK v2.0
+
+- **Full Python SDK**: `pip install GPUniq` — all endpoints accessible via `GPUniq` client
+- **Universal API Key Auth**: API keys now work across all endpoints (marketplace, instances, volumes, LLM, payments, settings)
+- **Rate Limiting**: 120 req/min per API key with auto-retry in SDK
+- **8 SDK Modules**: marketplace, gpu_cloud, burst, instances, volumes, llm, payments, settings
+- **Backward compatible**: v1.x `gpuniq.init()` and `client.request()` still work
+
+## GPU Dex-Cloud
+
+- **Deploy by GPU type**: Pick a GPU model, the platform finds the best server automatically
+- **One-call deployment**: `client.gpu_cloud.deploy(gpu_name="RTX_4090")`
+- **Pricing API**: Check pricing before deploying
+
+## GPU Burst
+
+- **Multi-GPU burst orders**: Scale to 100 GPUs in a single order
+- **Fallback GPUs**: Define alternative GPU types with price caps
+- **Cost estimation**: Estimate burst cost before committing
+- **Per-order billing**: Transaction and run history per order
+
+## Persistent Volumes
+
+- **Persistent storage**: Create volumes that survive instance restarts
+- **File management**: Upload, download, list, and delete files via API/SDK
+- **Attach to any instance**: Mount volumes at creation time across all deployment modes
+- **Sync logs**: Monitor volume sync operations
+
+## LLM API
+
+- **Unified LLM access**: OpenAI, Qwen, DeepSeek, Llama, Mistral, and more
+- **Chat sessions**: Persistent conversations with message history
+- **Token management**: Balance, packages, usage history
+- **Terminal commands**: Generate shell commands from natural language
+
+## Settings
+
+- **SSH key management**: Add, update, toggle, delete SSH keys via API
+- **Per-instance SSH keys**: Attach/detach keys to individual instances
+- **Telegram notifications**: Link Telegram for status alerts
+
+</Update>
 
 <Update label="2026-01-09" description="v0.5.1" tags={["feature", "improvement"]}>
 
 ## New Features
 
-- **GPU Analytics Dashboard**: Comprehensive market analytics with price tracking, availability trends, and GPU model comparisons across providers.
-- **Enhanced AI Recommendations**: Improved AI assistant now considers your usage history and budget constraints for better GPU suggestions.
-- **Async Order Creation**: New `/v1/marketplace/order/async` endpoint for reliable order creation with job status polling.
+- **GPU Analytics Dashboard**: Market analytics with price tracking and availability trends
+- **Enhanced AI Recommendations**: Improved GPU suggestions based on usage history
+- **Async Order Creation**: Reliable order creation with job status polling
+- **SLA Monitoring**: Real-time uptime tracking per instance
 
 ## Improvements
 
-- Faster marketplace loading with optimized database queries
-- Improved SSH connection reliability with automatic port allocation
-- Enhanced provider verification system with reliability scoring
-- Better error messages for payment and rental issues
-
-## Bug Fixes
-
-- Fixed occasional timeout issues during peak marketplace usage
-- Resolved balance calculation discrepancies for long-running rentals
-- Fixed session management issues causing unexpected logouts
+- Faster marketplace loading with optimized queries
+- Improved SSH connection reliability
+- Enhanced provider verification with reliability scoring
 
 </Update>
 
@@ -38,20 +73,9 @@ Stay informed about GPUniq's evolution. Review changes below to understand new c
 
 ## New Features
 
-- **USDT Payments (TRC20)**: Deposit and withdraw funds using Tether on Tron network
-- **Flexible Pricing Types**: Choose between per-minute, hourly, daily, weekly, or monthly billing
-- **Provider Dashboard**: GPU owners can now manage their listings, view active rentals, and track earnings
-
-## Improvements
-
-- Real-time balance updates during rentals
-- Improved marketplace filters with VRAM and location options
-- Enhanced mobile responsiveness
-
-## Bug Fixes
-
-- Fixed provider port range conflicts
-- Resolved rental duration calculation issues
+- **USDT Payments (TRC20)**: Deposit and withdraw using Tether on Tron network
+- **Flexible Pricing Types**: Hourly, daily, weekly, and monthly billing
+- **Provider Dashboard**: GPU owners can manage listings and track earnings
 
 </Update>
 
@@ -59,20 +83,9 @@ Stay informed about GPUniq's evolution. Review changes below to understand new c
 
 ## New Features
 
-- **AI GPU Recommendations**: Ask natural language questions to get GPU suggestions
-- **Task History API**: Track your rental history with detailed statistics
-- **Session Management**: View and manage active login sessions
-
-## Improvements
-
-- Enhanced API documentation with OpenAPI 3.1 spec
-- Improved error handling with detailed messages
-- Faster marketplace search with caching
-
-## Bug Fixes
-
-- Fixed authentication token refresh issues
-- Resolved marketplace pagination bugs
+- **AI GPU Recommendations**: Natural language GPU suggestions
+- **Task History API**: Rental history with detailed statistics
+- **Session Management**: View and manage active sessions
 
 </Update>
 
@@ -81,19 +94,8 @@ Stay informed about GPUniq's evolution. Review changes below to understand new c
 ## New Features
 
 - **Multi-GPU Support**: Rent machines with multiple GPUs
-- **Provider Agent**: Install our agent to connect your GPUs to the marketplace
+- **Provider Agent**: Connect your GPUs to the marketplace
 - **Heartbeat Monitoring**: Real-time provider availability tracking
-
-## Improvements
-
-- Streamlined registration flow with email verification
-- Google OAuth integration for quick sign-up
-- Better GPU specification display
-
-## Bug Fixes
-
-- Fixed SSH connection issues with certain providers
-- Resolved payment processing delays
 
 </Update>
 
@@ -102,33 +104,15 @@ Stay informed about GPUniq's evolution. Review changes below to understand new c
 ## Initial Launch
 
 - **GPU Marketplace**: Browse and rent GPUs from providers worldwide
-- **Instant SSH Access**: Get SSH credentials immediately after rental
-- **YooKassa Payments**: Support for Russian payment methods
-- **User Dashboard**: Manage rentals, view balance, track usage
+- **Instant SSH Access**: Get credentials immediately after rental
+- **YooKassa Payments**: Russian payment methods
+- **User Dashboard**: Manage rentals, balance, and usage
 - **REST API**: Full API access for automation
 
 </Update>
 
 ## Upgrade Instructions
 
-GPUniq is a web-based platform - no client updates required. API clients should update to the latest endpoints as documented in the API Reference.
+**Python SDK**: `pip install --upgrade GPUniq`
 
-## Upcoming Features
-
-Explore what's next for GPUniq.
-
-<Columns cols={3}>
-  <Card title="Docker Image Support" icon="box" href="/features">
-    Specify custom Docker images when renting GPUs.
-  </Card>
-  <Card title="Team Accounts" icon="users" href="/features">
-    Shared billing and instance management for teams.
-  </Card>
-  <Card title="Reserved Capacity" icon="calendar" href="/features">
-    Book GPUs in advance for guaranteed availability.
-  </Card>
-</Columns>
-
-<Callout kind="tip">
-  Have feature requests? Join our Telegram community or email [support@gpuniq.com](mailto:support@gpuniq.com).
-</Callout>
+The API is backward compatible. Existing integrations continue to work.

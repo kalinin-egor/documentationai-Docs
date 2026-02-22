@@ -1,207 +1,121 @@
 ---
-title: Get Started with GPUniq
-description: Set up your account and launch your first GPU instance in minutes to begin your compute tasks.
+title: Quickstart
+description: Set up your account, install the SDK, and launch your first GPU instance in minutes.
 ---
 
 ## Prerequisites
 
-Before you begin, ensure you have:
+- A valid email address
+- Python 3.8+ (for SDK) or any HTTP client
+- Funds for GPU rental (USDT, Stripe, or YooKassa)
 
-- A valid email address for account verification
-- Basic knowledge of SSH for connecting to instances
-- Funds for GPU rental (USDT or rubles via YooKassa)
+## 1. Create Your Account
+
+<Steps>
+  <Step title="Sign Up">
+    Visit [gpuniq.com](https://gpuniq.com) and click **Sign Up**. Use email or Google Sign-In.
+  </Step>
+  <Step title="Verify Email">
+    Enter the 6-digit verification code sent to your inbox.
+  </Step>
+  <Step title="Add Funds">
+    Go to **Balance** in your dashboard and deposit via USDT (TRC20), Stripe, or YooKassa.
+  </Step>
+</Steps>
+
+## 2. Get Your API Key
+
+Go to **LLM API Keys** in your dashboard and create a new key. Your key starts with `gpuniq_` — save it securely.
 
 <Callout kind="info">
-
-GPUniq supports instant registration with Google OAuth for quick onboarding.
-
+  API keys work across all endpoints: marketplace, instances, volumes, LLM, and more.
 </Callout>
 
-## Create Your Account
+## 3. Install the SDK
 
-Follow these steps to sign up and verify your email.
+```bash
+pip install GPUniq
+```
 
-<Steps>
-  <Step title="Sign Up" icon="user-plus">
-    Visit [gpuniq.com](https://gpuniq.com) and click **Sign Up**.
+## 4. Your First GPU Rental
 
-    Fill in your email, username, and password. Alternatively, use Google Sign-In for instant access.
-  </Step>
-  <Step title="Verify Email" icon="mail">
-    Check your inbox for a verification code from GPUniq.
+### Option A: Dex-Cloud (Simplest)
 
-    Enter the 6-digit code to activate your account.
-  </Step>
-  <Step title="Log In" icon="log-in">
-    Return to the dashboard and log in with your credentials.
+Pick a GPU type and deploy — the platform finds the best machine automatically.
 
-    You'll land on the marketplace overview.
-  </Step>
-</Steps>
+```python
+from gpuniq import GPUniq
 
-## Add Funds to Your Account
+client = GPUniq(api_key="gpuniq_your_key")
 
-GPUniq supports multiple payment methods.
+# See available GPU types
+gpus = client.gpu_cloud.list_instances()
+for gpu in gpus["featured"]:
+    print(f"{gpu['gpu_name']}: ${gpu['gpu_price_per_gpu_hour_usd']}/hr")
 
-<Tabs>
-  <Tab title="Crypto (USDT)" icon="bitcoin">
-    1. Go to **Balance** in your dashboard
-    2. Click **Deposit with Crypto**
-    3. Send USDT (TRC20) to the provided address
-    4. Wait for blockchain confirmation (~2-5 minutes)
-  </Tab>
-  <Tab title="YooKassa (RUB)" icon="credit-card">
-    1. Go to **Balance** in your dashboard
-    2. Enter amount in rubles
-    3. Complete payment via YooKassa
-    4. Balance updates instantly
-  </Tab>
-</Tabs>
+# Deploy an RTX 4090
+deploy = client.gpu_cloud.deploy(
+    gpu_name="RTX_4090",
+    docker_image="pytorch/pytorch:latest",
+    disk_gb=100,
+)
+print(f"Deploying... Job ID: {deploy['job_id']}")
+```
 
-## Navigate the Marketplace
+### Option B: Marketplace (Full Control)
 
-The GPUniq marketplace provides access to hundreds of GPUs worldwide.
+Browse all available servers and pick a specific machine.
 
-<Columns cols={3}>
-  <Card title="Browse GPUs" icon="server" href="#launch-instance">
-    Filter by GPU model, VRAM, location, and price.
-  </Card>
-  <Card title="My Instances" icon="monitor" href="/managing-instances">
-    View and manage your active rentals.
-  </Card>
-  <Card title="Billing" icon="credit-card" href="/features">
-    Track usage, costs, and manage payments.
-  </Card>
-</Columns>
+```python
+# Browse GPUs with filters
+gpus = client.marketplace.list(
+    gpu_model=["RTX 4090"],
+    min_vram_gb=24,
+    sort_by="price-low",
+)
+print(f"Found {gpus['total_count']} GPUs")
 
-## Rent Your First GPU
+# Rent a specific machine
+agent_id = gpus["agents"][0]["id"]
+order = client.marketplace.create_order(
+    agent_id=agent_id,
+    pricing_type="hour",
+    docker_image="pytorch/pytorch:latest",
+)
+```
 
-Select a powerful GPU and deploy it in seconds.
+## 5. Connect to Your Instance
 
-<Steps>
-  <Step title="Filter GPUs" icon="search">
-    Use the marketplace filters:
-    - **GPU Model**: RTX 4090, A100, H100, etc.
-    - **VRAM**: Minimum/maximum GB
-    - **Price**: Hourly rate range
-    - **Location**: Geographic region
-    - **Verified**: Show only verified providers
-  </Step>
-  <Step title="Select GPU" icon="zap">
-    Click on a GPU card to view details including:
-    - Full hardware specs (RAM, CPU, storage)
-    - Provider reliability score
-    - Available port range
-  </Step>
-  <Step title="Rent" icon="rocket">
-    Click **Rent Now**. Choose pricing type:
-    - Per minute (most flexible)
-    - Per hour
-    - Per day/week/month (discounts available)
+After deployment, find SSH credentials in your dashboard or via API:
 
-    Your instance starts immediately.
-  </Step>
-</Steps>
-
-## Connect to Your Instance
-
-Once rented, you'll receive SSH access credentials.
-
-<Tabs>
-  <Tab title="SSH Connection" icon="terminal">
-    Use the SSH command from your dashboard:
+```python
+instances = client.instances.list()
+for inst in instances["instances"]:
+    print(f"Task {inst['task_id']}: {inst['status']}")
+```
 
 ```bash
 ssh root@<host> -p <port>
-# Enter the password shown in your dashboard
-```
-  </Tab>
-  <Tab title="API Launch" icon="code">
-    Launch programmatically for automation:
-
-<CodeGroup tabs="cURL,JavaScript,Python">
-```bash
-curl -X POST https://api.gpuniq.com/v1/marketplace/order \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agent_id": 123,
-    "gpu_required": 1,
-    "pricing_type": "minute"
-  }'
+# Password shown in dashboard
 ```
 
-```javascript
-const response = await fetch('https://api.gpuniq.com/v1/marketplace/order', {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer YOUR_API_KEY',
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    agent_id: 123,
-    gpu_required: 1,
-    pricing_type: 'minute'
-  })
-});
-```
-
-```python
-import requests
-response = requests.post(
-  'https://api.gpuniq.com/v1/marketplace/order',
-  headers={'Authorization': 'Bearer YOUR_API_KEY'},
-  json={
-    'agent_id': 123,
-    'gpu_required': 1,
-    'pricing_type': 'minute'
-  }
-)
-```
-</CodeGroup>
-  </Tab>
-</Tabs>
-
-## Basic Configuration
-
-Common parameters when renting GPUs:
-
-<ParamField path="agent_id" param-type="integer" required="true">
-  The ID of the GPU/agent to rent (from marketplace list).
-</ParamField>
-
-<ParamField path="gpu_required" param-type="integer" required="false">
-  Number of GPUs to reserve (default: all available on the machine).
-</ParamField>
-
-<ParamField query="pricing_type" param-type="string" required="false">
-  Billing interval: `minute`, `hour`, `day`, `week`, or `month`.
-</ParamField>
-
-For AI tasks, most GPUs come with CUDA pre-installed. Verify with:
+## 6. Verify GPU Access
 
 ```bash
 nvidia-smi
+python -c "import torch; print(torch.cuda.is_available())"
 ```
 
-<Callout kind="tip">
+## What's Next
 
-Verified providers (indicated by a badge) have been tested for reliability and uptime.
-
-</Callout>
-
-## Next Steps
-
-- Monitor your instance in the dashboard
-- Stop/resume instances to pause billing
-- Explore the API for automation
-- Connect your own GPU to earn as a provider
-
-<Columns cols={2}>
-  <Card title="API Reference" icon="book-open" href="/api-reference">
-    Full API documentation for automation.
+<Columns cols="3">
+  <Card title="GPU Marketplace" href="/gpu-marketplace" icon="store">
+    Browse and filter 5000+ GPUs.
   </Card>
-  <Card title="Troubleshooting" icon="help-circle" href="/help-center/troubleshooting/connection-issues">
-    Common issues and solutions.
+  <Card title="Volumes" href="/volumes" icon="hard-drive">
+    Persistent storage for your data.
+  </Card>
+  <Card title="Python SDK" href="/sdk" icon="code">
+    Full SDK reference.
   </Card>
 </Columns>

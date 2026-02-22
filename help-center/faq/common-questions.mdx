@@ -1,106 +1,111 @@
 ---
 title: Frequently Asked Questions
-description: Common questions about GPUniq GPU rental marketplace.
+description: Common questions about the GPUniq GPU Meta-Cloud platform.
 ---
 
 ## General
 
 ### What is GPUniq?
 
-GPUniq is a GPU rental marketplace that connects users who need compute power with GPU owners worldwide. Rent high-performance GPUs for AI training, machine learning, rendering, and more at competitive prices.
+GPUniq is a GPU Meta-Cloud platform that aggregates compute capacity from multiple providers. Rent GPUs through three modes: [Marketplace](/gpu-marketplace), [Dex-Cloud](/gpu-dex-cloud), and [Burst](/gpu-burst). Access persistent storage, LLM models, and manage everything through a Python SDK or REST API.
 
 ### How is GPUniq different from AWS/GCP/Azure?
 
-GPUniq is a peer-to-peer marketplace:
 - **Lower prices**: Up to 70% cheaper than major cloud providers
-- **More GPU options**: Access to consumer and professional GPUs
-- **Flexible billing**: Per-minute, hourly, or longer-term pricing
-- **No commitments**: Rent for as little or as long as you need
+- **More GPU options**: Consumer and professional GPUs from thousands of providers
+- **Flexible billing**: Hourly, daily, weekly, or monthly pricing
+- **No commitments**: Rent for as long as you need, stop anytime
+- **Python SDK**: `pip install GPUniq` for full programmatic control
 
 ### What GPUs are available?
 
-The marketplace includes various NVIDIA GPUs depending on what providers have connected:
-- Consumer: RTX 3090, RTX 4090
+The marketplace includes 5000+ servers with GPUs including:
+- Consumer: RTX 3090, RTX 4090, RTX 5090
 - Professional: A100, H100, A6000, L40S
-- And more depending on provider availability
+- Availability varies in real-time
+
+## Authentication
+
+### How do I authenticate?
+
+Two methods:
+- **API Key** (recommended): Create in dashboard under **LLM API Keys**. Use `X-API-Key` header or Python SDK.
+- **JWT Token**: For web dashboard, uses `Authorization: Bearer` header.
+
+### What's the rate limit?
+
+120 requests/minute per API key. The Python SDK automatically retries on rate limit.
+
+## GPU Compute
+
+### What are the three deployment modes?
+
+| Mode | Description | Best For |
+|------|-------------|----------|
+| [Marketplace](/gpu-marketplace) | Browse and pick a specific server | Long training, specific hardware |
+| [Dex-Cloud](/gpu-dex-cloud) | Deploy by GPU type (auto-provisioned) | Quick experiments |
+| [Burst](/gpu-burst) | Scale to 100 GPUs with fallback | Distributed training |
+
+### Can I use Docker images?
+
+Yes. Specify a `docker_image` when creating orders (e.g., `pytorch/pytorch:latest`).
+
+### How do I connect to my GPU?
+
+Use SSH with credentials from your dashboard:
+
+```bash
+ssh root@{host} -p {port}
+```
+
+Or manage SSH keys via the [Settings](/settings) page for passwordless access.
 
 ## Payments
 
 ### What payment methods are supported?
 
-- **USDT (TRC20)**: Deposit and withdraw using Tether on Tron network
-- **YooKassa**: Bank cards and local methods for Russian users
+- **USDT (TRC20)**: Crypto deposits via Tron network
+- **Stripe**: International bank cards
+- **YooKassa**: Russian bank cards and local methods
 
 ### How does billing work?
 
-You choose a pricing type when renting:
-- **Per minute**: Most flexible, charged every minute
-- **Per hour/day/week/month**: Discounted rates for longer commitments
-
-Your balance is deducted in real-time as you use GPU resources.
+Balance is deducted in real-time as you use resources. Longer pricing commitments (day/week/month) offer 20-40% savings over hourly rates.
 
 ### Can I withdraw my balance?
 
-Yes, you can withdraw your balance in USDT to any TRC20 wallet address.
+Yes, withdraw in USDT to any TRC20 wallet address.
 
-## Rentals
+## Storage
 
-### How do I rent a GPU?
+### How do I persist data between instances?
 
-1. Browse the marketplace at [gpuniq.com](https://gpuniq.com)
-2. Filter by GPU model, VRAM, price, location
-3. Click on a GPU to see details
-4. Click "Rent Now" and choose pricing type
-5. Get instant SSH access
+Use [Volumes](/volumes) — persistent storage that survives instance stop/start/delete. Create a volume, upload data, and attach it to any instance.
 
-### How do I connect to my rented GPU?
+### What's the maximum upload size?
 
-Use SSH with the credentials provided in your dashboard:
+500 MB per file via API. For larger files, use SCP/rsync directly to the instance.
 
-```bash
-ssh root@{host} -p {port}
-# Enter password from dashboard
+## LLM API
+
+### What models are available?
+
+Models from OpenAI, Qwen, DeepSeek, Meta Llama, Mistral, NVIDIA, and more. See [LLM API](/llm) docs or call `client.llm.models()`.
+
+### How do I use the LLM API?
+
+```python
+from gpuniq import GPUniq
+client = GPUniq(api_key="gpuniq_your_key")
+response = client.llm.chat("openai/gpt-oss-120b", "Hello!")
 ```
-
-### What if I can't connect?
-
-1. Verify your instance is "Running" in the dashboard
-2. Double-check the SSH host, port, and password
-3. Try stopping and starting the instance
-4. Contact support if issues persist
-
-### How do I stop being charged?
-
-Click "Stop" to pause billing (instance may be preserved) or "Delete" to terminate completely.
-
-## For Providers
-
-### How do I become a GPU provider?
-
-1. Have a machine with NVIDIA GPU(s)
-2. Install the GPUniq agent
-3. Register your agent via API with pricing
-4. Your GPU appears in the marketplace
-
-### What's the commission structure?
-
-GPUniq takes a small platform fee from each rental. Providers receive the majority of the rental price directly to their balance.
-
-### Can I control who rents my GPU?
-
-You can set maximum rental durations and force-stop problematic rentals through the provider dashboard.
 
 ## Technical
 
 ### Do GPUs come with CUDA installed?
 
-Most providers have CUDA pre-installed. Verify by running `nvidia-smi` after connecting.
-
-### Can I use custom Docker images?
-
-Docker image support is coming soon. Currently, you connect via SSH to the base environment.
+Most providers have CUDA pre-installed. Verify with `nvidia-smi` after connecting.
 
 ### Is my data secure?
 
-Each rental runs in an isolated container. When you delete your instance, data is removed. For sensitive workloads, ensure you delete instances after use.
-
+Each rental runs in an isolated Docker container. When you delete your instance, data is removed. Use [Volumes](/volumes) for data you need to keep.

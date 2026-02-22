@@ -1,0 +1,189 @@
+---
+title: GPU Marketplace
+description: Browse 5000+ GPU servers from multiple providers, compare specs and pricing, and rent specific machines with full control.
+---
+
+## Overview
+
+The GPU Marketplace gives you full control over individual machines. Browse thousands of GPU servers from providers worldwide, compare hardware specs, pricing, reliability scores, and rent the exact machine you need.
+
+Best for long-running training jobs where you need a particular hardware configuration.
+
+## Browse GPUs
+
+Filter the marketplace by GPU model, VRAM, price, location, and more.
+
+<CodeGroup>
+```python Python SDK
+from gpuniq import GPUniq
+client = GPUniq(api_key="gpuniq_your_key")
+
+gpus = client.marketplace.list(
+    gpu_model=["RTX 4090", "A100"],
+    min_vram_gb=24,
+    min_inet_speed_mbps=500,
+    verified_only=True,
+    sort_by="price-low",
+    page=1,
+    page_size=20,
+)
+
+print(f"Found {gpus['total_count']} GPUs")
+for agent in gpus["agents"]:
+    print(f"  {agent['gpu_model']} x{agent['gpu_count']} — ${agent['price_per_hour']}/hr")
+```
+
+```bash cURL
+curl "https://api.gpuniq.com/v1/marketplace/list?sort_by=price-low&page_size=20&min_vram_gb=24" \
+  -H "X-API-Key: gpuniq_your_key"
+```
+</CodeGroup>
+
+### Filter Parameters
+
+<ParamField query="gpu_model" type="string[]">
+  Filter by GPU model names (e.g., "RTX 4090", "A100").
+</ParamField>
+
+<ParamField query="min_vram_gb" type="number">
+  Minimum VRAM in gigabytes.
+</ParamField>
+
+<ParamField query="max_price_per_hour" type="number">
+  Maximum hourly price in USD.
+</ParamField>
+
+<ParamField query="location" type="string">
+  Geographic location filter.
+</ParamField>
+
+<ParamField query="verified_only" type="boolean">
+  Show only verified providers with proven reliability.
+</ParamField>
+
+<ParamField query="min_gpu_count" type="integer">
+  Minimum number of GPUs on the machine.
+</ParamField>
+
+<ParamField query="min_inet_speed_mbps" type="number">
+  Minimum internet speed in Mbps.
+</ParamField>
+
+<ParamField query="sort_by" type="string" default="price-low">
+  Sort order: `price-low`, `price-high`, `vram`, `reliability`.
+</ParamField>
+
+## Marketplace Statistics
+
+Get an overview of the marketplace: total GPUs online, price ranges, locations.
+
+```python
+stats = client.marketplace.statistics(gpu_model=["RTX 4090"])
+print(f"Online: {stats['online']}")
+print(f"Min price: ${stats['min_price']}/hr")
+print(f"Locations: {stats['locations']}")
+```
+
+## View Agent Details
+
+Inspect full hardware specs, pricing tiers, and provider reliability for a specific machine.
+
+```python
+agent = client.marketplace.get_agent(agent_id=29279811)
+```
+
+## Check Availability
+
+Verify a machine is still available before placing an order.
+
+```python
+avail = client.marketplace.check_availability(agent_id=29279811)
+```
+
+## Create an Order
+
+### Synchronous
+
+```python
+order = client.marketplace.create_order(
+    agent_id=29279811,
+    pricing_type="hour",
+    docker_image="pytorch/pytorch:latest",
+    ssh_key_ids=[1, 2],
+    disk_gb=100,
+    volume_id=9,
+)
+```
+
+### Order Parameters
+
+<ParamField body="agent_id" type="integer" required>
+  The ID of the GPU server to rent.
+</ParamField>
+
+<ParamField body="pricing_type" type="string" default="month">
+  Billing interval: `hour`, `day`, `week`, `month`.
+</ParamField>
+
+<ParamField body="docker_image" type="string">
+  Docker image to deploy (e.g., `pytorch/pytorch:latest`).
+</ParamField>
+
+<ParamField body="ssh_key_ids" type="integer[]">
+  SSH key IDs to attach to the instance.
+</ParamField>
+
+<ParamField body="disk_gb" type="integer">
+  Disk size in GB.
+</ParamField>
+
+<ParamField body="volume_id" type="integer">
+  Persistent volume to attach.
+</ParamField>
+
+### Async (Recommended for Production)
+
+For better reliability, use async order creation which returns a job ID for polling:
+
+```python
+job = client.marketplace.create_order_async(
+    agent_id=29279811,
+    pricing_type="hour",
+    docker_image="pytorch/pytorch:latest",
+)
+
+# Poll for status
+import time
+while True:
+    status = client.marketplace.get_order_status(job["job_id"])
+    if status["status"] in ("completed", "failed"):
+        break
+    time.sleep(2)
+```
+
+<Callout kind="tip">
+  Use async orders for production systems to handle network timeouts gracefully.
+</Callout>
+
+## Pricing
+
+| Type | Description | Best For |
+|------|-------------|----------|
+| Per Hour | Standard hourly billing | Regular workloads |
+| Per Day | Discounted daily rate | Extended training |
+| Per Week | Weekly discount | Production jobs |
+| Per Month | Best monthly rate | Continuous usage |
+
+Longer commitments typically offer 20-40% savings compared to hourly pricing.
+
+## Available GPU Types
+
+| GPU Model | VRAM | Typical Use Cases |
+|-----------|------|-------------------|
+| NVIDIA RTX 4090 | 24GB | Training, inference, rendering |
+| NVIDIA RTX 3090 | 24GB | ML workloads, cost-effective |
+| NVIDIA A100 | 40/80GB | Large model training, HPC |
+| NVIDIA H100 | 80GB | Frontier AI, research |
+| NVIDIA A6000 | 48GB | Professional rendering, ML |
+| NVIDIA L40S | 48GB | Inference, video processing |
+| NVIDIA RTX 5090 | 32GB | Latest generation, fast training |

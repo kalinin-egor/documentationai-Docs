@@ -39,6 +39,11 @@
       "url": "https://gpuniq.com"
     },
     {
+      "name": "PyPI",
+      "icon": "python",
+      "url": "https://pypi.org/project/GPUniq/"
+    },
+    {
       "name": "Telegram",
       "icon": "telegram",
       "url": "https://t.me/gpuniq"
@@ -49,14 +54,26 @@
       "group": "Getting Started",
       "pages": [
         "introduction",
-        "quickstart"
+        "quickstart",
+        "sdk"
       ]
     },
     {
-      "group": "Core Concepts",
+      "group": "GPU Compute",
       "pages": [
-        "features",
+        "gpu-marketplace",
+        "gpu-dex-cloud",
+        "gpu-burst",
         "managing-instances"
+      ]
+    },
+    {
+      "group": "Platform",
+      "pages": [
+        "volumes",
+        "llm",
+        "payments",
+        "settings"
       ]
     },
     {

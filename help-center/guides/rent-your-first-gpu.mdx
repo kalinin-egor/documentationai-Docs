@@ -1,113 +1,105 @@
 ---
 title: How to Rent Your First GPU
-description: Complete guide to renting a GPU from GPUniq marketplace.
+description: Step-by-step guide to renting a GPU on GPUniq — from account creation to running your first workload.
 ---
 
 ## Quick Start
 
-Rent a powerful GPU in a few simple steps.
-
 <Steps>
   <Step title="Create Account">
     Go to [gpuniq.com](https://gpuniq.com) and sign up with your email or Google account.
-    
-    Verify your email with the 6-digit code sent to your inbox.
+    Verify your email with the 6-digit code.
   </Step>
   <Step title="Add Funds">
     Navigate to **Balance** in your dashboard.
-    
-    Choose your deposit method:
-    - **USDT (TRC20)**: Send to the provided wallet address
-    - **YooKassa**: Pay with Russian bank cards
-    
-    Wait for your balance to update (crypto: ~2-5 min, cards: instant).
+    Choose your deposit method: USDT (TRC20), Stripe, or YooKassa.
   </Step>
-  <Step title="Browse Marketplace">
-    Use filters to find the right GPU:
-    - **GPU Model**: RTX 4090, A100, H100, etc.
-    - **VRAM**: Minimum gigabytes needed
-    - **Price**: Maximum hourly rate
-    - **Verified**: Show only reliable providers
+  <Step title="Get API Key">
+    Go to **LLM API Keys** and create a new key starting with `gpuniq_`.
   </Step>
-  <Step title="Select GPU">
-    Click on a GPU card to view details:
-    - Full hardware specifications
-    - Provider reliability score
-    - Current availability
-    - Pricing options
+  <Step title="Install SDK">
+    ```bash
+    pip install GPUniq
+    ```
   </Step>
-  <Step title="Rent">
-    Click **Rent Now** and choose:
-    - Per minute (most flexible)
-    - Per hour, day, week, or month (discounts)
-    
-    Your instance starts immediately!
+  <Step title="Deploy">
+    ```python
+    from gpuniq import GPUniq
+    client = GPUniq(api_key="gpuniq_your_key")
+
+    deploy = client.gpu_cloud.deploy(
+        gpu_name="RTX_4090",
+        docker_image="pytorch/pytorch:latest",
+        disk_gb=100,
+    )
+    ```
   </Step>
   <Step title="Connect">
-    Find your SSH credentials in the dashboard:
-    
+    Find SSH credentials in the dashboard:
     ```bash
     ssh root@{host} -p {port}
-    # Password shown in dashboard
     ```
-    
-    You're now connected to your GPU!
   </Step>
 </Steps>
 
-## What to Do After Connecting
+## After Connecting
 
 ### Verify GPU Access
 
 ```bash
-# Check GPU is detected
 nvidia-smi
-
-# Verify CUDA
 nvcc --version
+python -c "import torch; print(torch.cuda.is_available())"
 ```
 
 ### Install Your Tools
 
 ```bash
-# Example: PyTorch
-pip install torch torchvision
-
-# Example: Verify GPU works with PyTorch
-python -c "import torch; print(torch.cuda.is_available())"
+pip install torch torchvision transformers
 ```
 
 ### Transfer Your Data
 
-```bash
-# From your local machine
-scp -P {port} my_data.zip root@{host}:/root/
+<Tabs>
+  <Tab title="Using Volumes (Recommended)" icon="hard-drive">
+    ```python
+    # Upload data to a volume
+    client.volumes.upload(volume_id=1, file_path="./data.tar.gz")
 
-# Or use rsync for larger transfers
-rsync -avz -e "ssh -p {port}" ./my_project root@{host}:/root/
-```
+    # Attach volume when deploying
+    deploy = client.gpu_cloud.deploy(
+        gpu_name="RTX_4090",
+        volume_id=1,
+    )
+    ```
+  </Tab>
+  <Tab title="Using SCP" icon="terminal">
+    ```bash
+    scp -P {port} my_data.zip root@{host}:/root/
+    rsync -avz -e "ssh -p {port}" ./project root@{host}:/root/
+    ```
+  </Tab>
+</Tabs>
 
 ## Managing Your Rental
 
-### Stop Billing
+```python
+# Stop billing (pause instance)
+client.instances.stop(task_id=456)
 
-When done, go to **My Instances** and click:
-- **Stop**: Pause billing (may preserve state)
-- **Delete**: Terminate completely (all data lost)
+# Resume
+client.instances.start(task_id=456)
 
-### Monitor Usage
-
-Your dashboard shows:
-- Running time
-- Cost so far
-- Remaining balance
+# Delete permanently
+client.instances.delete(task_id=456)
+```
 
 <Callout kind="tip">
-  Set up balance alerts to avoid unexpected stops when funds run low.
+  Use [Volumes](/volumes) to persist data between instances. Instance storage is lost on delete.
 </Callout>
 
 ## Next Steps
 
-- Explore the [API Reference](/api-reference) for automation
-- Read about [Managing Instances](/managing-instances) for advanced control
-- Check [Troubleshooting](/help-center/troubleshooting/connection-issues) if you have issues
+- Explore the [GPU Marketplace](/gpu-marketplace) for more hardware options
+- Set up [SSH Keys](/settings) for passwordless access
+- Read the full [SDK Reference](/sdk)

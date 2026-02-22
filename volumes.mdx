@@ -1,0 +1,165 @@
+---
+title: Volumes
+description: Persistent storage that survives instance restarts — upload data, attach volumes to any GPU instance.
+---
+
+## Overview
+
+Volumes are persistent storage directories that survive instance restarts and can be attached to any GPU instance. Use them to store datasets, model checkpoints, and training outputs.
+
+Key features:
+- **Persistent**: Data survives instance stop/start/delete
+- **Attachable**: Mount to any instance at creation time
+- **File management**: Upload, download, list, and delete files via API
+- **Configurable size**: 1-100 GB per volume
+
+## Pricing
+
+```python
+from gpuniq import GPUniq
+client = GPUniq(api_key="gpuniq_your_key")
+
+pricing = client.volumes.pricing()
+print(f"${pricing['price_per_gb_day']}/GB/day")
+```
+
+## Create a Volume
+
+<CodeGroup>
+```python Python SDK
+vol = client.volumes.create(
+    name="my-dataset",
+    size_limit_gb=50,
+    description="Training data for BERT fine-tuning",
+)
+print(f"Volume ID: {vol['id']}")
+```
+
+```bash cURL
+curl -X POST "https://api.gpuniq.com/v1/volumes/" \
+  -H "X-API-Key: gpuniq_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "my-dataset", "size_limit_gb": 50}'
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField body="name" type="string" required>
+  Volume name. Alphanumeric, hyphens, underscores only (1-64 chars).
+</ParamField>
+
+<ParamField body="size_limit_gb" type="number" default="10">
+  Size limit in GB (1-100).
+</ParamField>
+
+<ParamField body="description" type="string">
+  Optional description (max 256 chars).
+</ParamField>
+
+## List Volumes
+
+```python
+volumes = client.volumes.list()
+for vol in volumes:
+    print(f"{vol['name']} — {vol['used_size_bytes']} bytes used, status: {vol['status']}")
+
+# Archived volumes
+archived = client.volumes.list_archived()
+```
+
+## Upload Files
+
+Upload local files to a volume:
+
+```python
+client.volumes.upload(
+    volume_id=1,
+    file_path="/local/path/data.tar.gz",
+    subpath="datasets/",
+)
+```
+
+<Callout kind="info">
+  Maximum upload size: 500 MB per file. For larger files, use SCP/rsync directly to the instance.
+</Callout>
+
+## List Files
+
+```python
+files = client.volumes.list_files(volume_id=1, subpath="datasets/")
+for f in files["files"]:
+    print(f"{f['name']} — {f['size']} bytes")
+```
+
+## Download Files
+
+```python
+# Get raw bytes
+content = client.volumes.download(volume_id=1, path="datasets/data.tar.gz")
+
+# Save directly to local file
+client.volumes.download_to(
+    volume_id=1,
+    remote_path="datasets/data.tar.gz",
+    local_path="./data.tar.gz",
+)
+```
+
+## Delete Files
+
+```python
+client.volumes.delete_file(volume_id=1, path="datasets/old_data.tar.gz")
+```
+
+## Update Volume
+
+```python
+client.volumes.update(volume_id=1, size_limit_gb=100, description="Updated description")
+```
+
+## Delete Volume
+
+```python
+client.volumes.delete(volume_id=1)
+```
+
+<Callout kind="warning">
+  Deleting a volume permanently removes all files. This action is irreversible.
+</Callout>
+
+## Attach Volume to Instance
+
+Pass `volume_id` when creating an order:
+
+```python
+# Marketplace order with volume
+order = client.marketplace.create_order(
+    agent_id=123,
+    pricing_type="hour",
+    volume_id=9,
+)
+
+# Dex-Cloud deploy with volume
+deploy = client.gpu_cloud.deploy(
+    gpu_name="RTX_4090",
+    volume_id=9,
+)
+
+# Burst order with volume
+order = client.burst.create_order(
+    docker_image="pytorch/pytorch:latest",
+    primary_gpu="RTX_4090",
+    gpu_count=4,
+    volume_id=9,
+)
+```
+
+## Sync Logs
+
+Monitor volume sync operations:
+
+```python
+logs = client.volumes.sync_logs(volume_id=1, limit=50)
+client.volumes.cancel_sync(log_id=5)
+```
