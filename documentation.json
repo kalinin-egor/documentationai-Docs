@@ -16,7 +16,7 @@
         "icon": "book",
         "dropdowns": [
           {
-            "dropdown": "Тест",
+            "dropdown": "Python SDK",
             "groups": [
               {
                 "group": "Getting Started",
@@ -31,28 +31,79 @@
                     "title": "Quickstart",
                     "path": "quickstart",
                     "icon": "zap"
+                  },
+                  {
+                    "title": "SDK Reference",
+                    "path": "sdk",
+                    "icon": "code"
                   }
                 ]
               },
               {
-                "group": "Core Concepts",
-                "icon": "layers",
+                "group": "GPU Compute",
+                "icon": "cpu",
                 "pages": [
                   {
-                    "title": "Features",
-                    "path": "features",
-                    "icon": "star"
-                  }
-                ]
-              },
-              {
-                "group": "Guides",
-                "icon": "compass",
-                "pages": [
+                    "title": "GPU Marketplace",
+                    "path": "gpu-marketplace",
+                    "icon": "shopping-cart"
+                  },
+                  {
+                    "title": "GPU Dex-Cloud",
+                    "path": "gpu-dex-cloud",
+                    "icon": "cloud"
+                  },
+                  {
+                    "title": "GPU Burst",
+                    "path": "gpu-burst",
+                    "icon": "zap"
+                  },
                   {
                     "title": "Managing Instances",
                     "path": "managing-instances",
                     "icon": "settings"
+                  }
+                ]
+              },
+              {
+                "group": "Platform",
+                "icon": "layers",
+                "pages": [
+                  {
+                    "title": "Volumes",
+                    "path": "volumes",
+                    "icon": "hard-drive"
+                  },
+                  {
+                    "title": "LLM API",
+                    "path": "llm",
+                    "icon": "message-circle"
+                  },
+                  {
+                    "title": "Payments",
+                    "path": "payments",
+                    "icon": "credit-card"
+                  },
+                  {
+                    "title": "Settings",
+                    "path": "settings",
+                    "icon": "sliders"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "dropdown": "CLI",
+            "groups": [
+              {
+                "group": "Getting Started",
+                "icon": "terminal",
+                "pages": [
+                  {
+                    "title": "CLI",
+                    "path": "cli",
+                    "icon": "terminal"
                   }
                 ]
               }
@@ -86,8 +137,8 @@
             "expandable": false,
             "pages": [
               {
-                "title": "Egor Kalinin",
-                "path": "help-center/faq/egor-kalinin"
+                "title": "Common Questions",
+                "path": "help-center/faq/common-questions"
               }
             ]
           },
