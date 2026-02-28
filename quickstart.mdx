@@ -106,6 +106,24 @@ nvidia-smi
 python -c "import torch; print(torch.cuda.is_available())"
 ```
 
+## 7. Set Up Command Checkpointing (Optional)
+
+Use `gg` to checkpoint your commands — if your instance restarts, replay them instantly:
+
+```bash
+# Initialize gg with your instance token (shown in dashboard)
+gg init <your-gg-token>
+
+# Run commands with checkpointing
+gg run pip install torch transformers
+gg run python train.py --epochs 100
+
+# After a restart, replay unfinished commands
+gg replay
+```
+
+See the [CLI documentation](/cli) for full details.
+
 ## What's Next
 
 <Columns cols="3">

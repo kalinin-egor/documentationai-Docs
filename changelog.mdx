@@ -7,6 +7,19 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-02-28" description="v3.0.0" tags={["feature", "cli"]}>
+
+## CLI Tool (`gg`)
+
+- **Command checkpointing**: Every command run via `gg` is saved with full output, exit code, and timing
+- **Replay on restart**: `gg replay` re-runs interrupted commands after instance restarts
+- **PTY support**: Full terminal colors, progress bars, and interactive prompts
+- **Backend sync**: Checkpoints are synced to the GPUniq backend automatically
+- **6 commands**: `gg init`, `gg run`, `gg list`, `gg logs`, `gg replay`, `gg status`
+- **Shorthand syntax**: `gg python train.py` works the same as `gg run python train.py`
+
+</Update>
+
 <Update label="2026-02-23" description="v2.0.0" tags={["feature", "sdk", "api"]}>
 
 ## Python SDK v2.0
