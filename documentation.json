@@ -97,12 +97,23 @@
             "dropdown": "CLI",
             "groups": [
               {
-                "group": "Getting Started",
-                "icon": "terminal",
+                "group": "Your Machine",
+                "icon": "monitor",
                 "pages": [
                   {
-                    "title": "CLI",
-                    "path": "cli",
+                    "title": "CLI Client",
+                    "path": "cli-client",
+                    "icon": "terminal"
+                  }
+                ]
+              },
+              {
+                "group": "GPU Instance",
+                "icon": "cpu",
+                "pages": [
+                  {
+                    "title": "CLI on GPU Instance",
+                    "path": "cli-gpu",
                     "icon": "terminal"
                   }
                 ]

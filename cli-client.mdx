@@ -1,0 +1,231 @@
+---
+title: CLI Client
+description: Manage GPU instances, SSH connections, volumes, and SSH keys from your local terminal.
+---
+
+## Overview
+
+The `gg` CLI client runs on your **local machine** (macOS, Linux, Windows) and lets you manage your GPUniq resources without opening a browser. View orders, SSH into instances, manage volumes and SSH keys — all from the terminal.
+
+**Key features:**
+- One-command SSH into rented GPUs
+- Interactive instance selection with arrow keys
+- Automatic SSH key detection and attachment
+- Volume and SSH key management
+- Cross-platform (macOS, Linux, Windows)
+
+## Installation
+
+```bash
+pip install GPUniq
+```
+
+Requires Python 3.8+. After installation, the `gg` command is available in your terminal.
+
+<Callout kind="info">
+  **Windows:** If `gg` is not found after install, use `python -m gpuniq.cli.main` or add your Python Scripts folder to PATH.
+</Callout>
+
+<Callout kind="info">
+  **Linux:** If `~/.local/bin` is not in your PATH, add `export PATH="$HOME/.local/bin:$PATH"` to your `~/.bashrc`.
+</Callout>
+
+## Authentication
+
+Authenticate with your GPUniq API key. Get one from the [CLI page](https://gpuniq.com/cli) in your dashboard.
+
+```bash
+gg login
+```
+
+You'll be prompted to enter your API key (hidden input). The key is stored in `~/.gpuniq/config.json`.
+
+You can also pass the key directly:
+
+```bash
+gg login gpuniq_your_key_here
+```
+
+## Commands
+
+### `gg orders`
+
+List your rented GPU instances with SSH connection details.
+
+```bash
+gg orders
+```
+
+**Output:**
+```
+ID       GPU                       STATUS         PRICE/HR     SSH COMMAND
+--------------------------------------------------------------------------------
+142      RTX 4090 x2               running        $0.45        ssh root@ssh.gpuniq.com -p 20142
+143      A100 80GB                 running        $1.20        ssh root@ssh.gpuniq.com -p 20143
+```
+
+Shows only active instances (running, starting, provisioning).
+
+### `gg open`
+
+SSH into a rented GPU instance. If you have one instance, it connects immediately. If multiple — select with arrow keys.
+
+```bash
+# Auto-select (single instance) or interactive menu
+gg open
+
+# Connect to a specific instance
+gg open 142
+```
+
+**Interactive selection:**
+```
+? Select instance:
+> #142  RTX 4090 x2  (running)  $0.45/hr
+  #143  A100 80GB    (running)  $1.20/hr
+```
+
+**Automatic SSH key attachment:** If a matching SSH key is found in `~/.ssh/`, the CLI offers to attach it to the instance before connecting.
+
+### `gg balance`
+
+Show your current account balance.
+
+```bash
+gg balance
+```
+
+**Output:**
+```
+$42.50
+```
+
+### `gg stop`
+
+Stop a running GPU instance. Requires confirmation.
+
+```bash
+# Interactive selection
+gg stop
+
+# Stop specific instance
+gg stop 142
+```
+
+The CLI asks for confirmation before stopping to prevent accidental shutdowns.
+
+### `gg ssh-keys`
+
+Manage SSH keys in your GPUniq account.
+
+#### List keys
+
+```bash
+gg ssh-keys list
+# or just
+gg ssh-keys
+```
+
+**Output:**
+```
+ID     NAME                      FINGERPRINT                                        ACTIVE
+---------------------------------------------------------------------------------------------
+1      id_ed25519                SHA256:abc123...                                   yes
+2      id_rsa                    SHA256:def456...                                   yes
+```
+
+#### Add a key
+
+Upload a local SSH public key to your GPUniq account.
+
+```bash
+gg ssh-keys add
+```
+
+The CLI scans `~/.ssh/` for public keys (`id_ed25519.pub`, `id_rsa.pub`, `id_ecdsa.pub`). If multiple are found, you select which one to upload.
+
+<Callout kind="tip">
+  After adding your SSH key, use `gg open` to connect — it will automatically offer to attach the key to your instance.
+</Callout>
+
+### `gg volumes`
+
+Manage persistent storage volumes.
+
+#### List volumes
+
+```bash
+gg volumes list
+# or just
+gg volumes
+```
+
+**Output:**
+```
+ID     NAME                      SIZE         USED         STATUS
+-------------------------------------------------------------------
+7      my-dataset                50 GB        12.3 GB      active
+8      checkpoints               100 GB       45.6 GB      active
+```
+
+#### Create a volume
+
+```bash
+gg volumes create my-data
+gg volumes create my-data --size 50
+gg volumes create my-data --size 50 --description "Training dataset"
+```
+
+Default size is 10 GB. Maximum 100 GB.
+
+#### Delete a volume
+
+```bash
+gg volumes delete 7
+```
+
+Requires confirmation. This permanently deletes the volume and all its data.
+
+## Typical Workflow
+
+```bash
+# 1. Install and authenticate
+pip install GPUniq
+gg login
+
+# 2. Add your SSH key
+gg ssh-keys add
+
+# 3. Create a volume for persistent data
+gg volumes create training-data --size 50
+
+# 4. Rent a GPU from the web dashboard (gpuniq.com)
+#    or via the Python SDK
+
+# 5. Check your instances
+gg orders
+
+# 6. Connect to your GPU
+gg open
+
+# 7. When done, stop the instance
+gg stop
+```
+
+## Configuration
+
+Client config is stored at `~/.gpuniq/config.json`:
+
+```json
+{
+  "version": 1,
+  "api_key": "gpuniq_...",
+  "api_base_url": "https://api.gpuniq.com/v1"
+}
+```
+
+To switch API endpoint (e.g. for development):
+
+```bash
+gg login --api-url https://dev-api.gpuniq.com/v1
+```
