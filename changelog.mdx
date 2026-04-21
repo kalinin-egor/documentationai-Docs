@@ -7,6 +7,18 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-04-21" description="v3.2.0" tags={["feature", "llm", "images"]}>
+
+## Image Generation
+
+- **Text-to-image** and **image-to-image** via the OpenAI-compatible `/v1/openai/images/generations` and native `/v1/llm/images/generations` endpoints.
+- **Four new models**: `nano-banana` ($0.0312/img), `nano-banana-pro` ($0.1072/img), `nano-banana-pro-4k` ($0.192/img), `grok-4-image` ($0.0352/img).
+- **Reference photos**: attach up to 4 photos with any prompt — Nano Banana handles the rest for image editing and style transfer.
+- **Flat per-image billing**: you pay only for delivered images. If the upstream content-policy rejects a frame you're charged only for what arrived.
+- **New in-app studio** at `/chat` — pick any image model and the composer switches to a text+photos panel with a gallery view.
+
+</Update>
+
 <Update label="2026-04-21" description="v3.1.0" tags={["feature", "llm", "api"]}>
 
 ## OpenAI-Compatible LLM Endpoint

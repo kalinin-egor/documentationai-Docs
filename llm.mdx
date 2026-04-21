@@ -1,11 +1,11 @@
 ---
-title: LLM API
-description: Access Claude, GPT-5, Gemini, Grok, and open-source models through a single API. OpenAI-compatible — works with Claude Code, Cursor, and LiteLLM.
+title: LLM & Image API
+description: Chat, reasoning, and image generation through a single OpenAI-compatible API. Claude, GPT-5, Gemini, Grok, Nano Banana, and more — one key, one balance.
 ---
 
 ## Overview
 
-GPUniq provides a single API surface for 80+ language models across Anthropic, OpenAI, Google, xAI, and the open-source community. One API key, one balance, one usage dashboard.
+GPUniq provides a single API surface for 80+ language models and image generators across Anthropic, OpenAI, Google, and xAI. One API key, one balance, one usage dashboard — chat completions, reasoning, and text-to-image all in the same place.
 
 You can use GPUniq LLMs two ways:
 
@@ -14,15 +14,27 @@ You can use GPUniq LLMs two ways:
 
 ## Available Models
 
+### Chat & Reasoning
+
 | Provider | Models | Best for |
 |----------|--------|----------|
 | **Anthropic** | Claude Opus 4.7 / 4.6 / 4.5, Sonnet 4.6 / 4.5, Haiku 4.5 | General reasoning, coding, agents |
 | **OpenAI** | GPT-5.2 Pro / Codex, GPT-5, o3, o3-mini, GPT-4o, GPT-4.1 | Reasoning, structured output, vision |
-| **Google** | Gemini 3 Pro / Flash, Gemini 2.5, Nano Banana | Long context, fast batch work |
+| **Google** | Gemini 3 Pro / Flash, Gemini 2.5 | Long context, fast batch work |
 | **xAI** | Grok 4, Grok 4.1 Thinking, Grok 4 Fast | Real-time knowledge, low latency |
-| **Open-source** | Qwen3, DeepSeek R1, Llama 3.3, Mistral, Gemma, Nemotron | Free tier for prototyping |
 
-Premium models are sold at **20% below vendor list price**. Free-tier models cost zero tokens.
+### Image Generation
+
+Image models are billed per returned image, not per token.
+
+| Model | Slug | Price / image | Notes |
+|-------|------|---------------|-------|
+| Nano Banana | `nano-banana` | $0.0312 | Fast text-to-image & image-to-image |
+| Nano Banana Pro | `nano-banana-pro` | $0.1072 | Higher quality, ~1K resolution |
+| Nano Banana Pro 4K | `nano-banana-pro-4k` | $0.192 | 4K resolution |
+| Grok 4 Image | `grok-4-image` | $0.0352 | xAI image generator |
+
+Chat models are sold at **20% below vendor list price**.
 
 Fetch the live catalog at any time:
 
@@ -115,6 +127,100 @@ for chunk in stream:
     if delta:
         print(delta, end="", flush=True)
 ```
+
+### Image Generation
+
+Both API surfaces expose a `/images/generations` endpoint that matches
+OpenAI's `images.generate` protocol. Use it with `nano-banana`,
+`nano-banana-pro`, `nano-banana-pro-4k`, or `grok-4-image`. Billing is
+flat per returned image — no token accounting.
+
+<CodeGroup>
+```python Python (OpenAI SDK)
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="gpuniq_your_key",
+    base_url="https://api.gpuniq.com/v1/openai",
+)
+
+resp = client.images.generate(
+    model="nano-banana-pro",
+    prompt="A cozy mountain cabin at sunrise, cinematic lighting",
+    n=2,
+    size="1024x1024",
+    response_format="b64_json",
+)
+
+for i, img in enumerate(resp.data):
+    with open(f"out_{i}.png", "wb") as f:
+        import base64
+        f.write(base64.b64decode(img.b64_json))
+```
+
+```python Native (image-to-image)
+import base64, requests
+
+with open("reference.jpg", "rb") as fh:
+    ref = "data:image/jpeg;base64," + base64.b64encode(fh.read()).decode()
+
+resp = requests.post(
+    "https://api.gpuniq.com/v1/llm/images/generations",
+    headers={"X-API-Key": "gpuniq_your_key"},
+    json={
+        "model": "nano-banana-pro",
+        "prompt": "Redraw the cabin in watercolor style",
+        "n": 1,
+        "size": "2048x2048",
+        "input_images": [ref],
+    },
+).json()
+
+print("cost:", resp["data"]["cost_usd"])
+```
+
+```bash cURL
+curl -X POST https://api.gpuniq.com/v1/openai/images/generations \
+  -H "Authorization: Bearer gpuniq_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "grok-4-image",
+    "prompt": "Studio portrait of an astronaut in a pink desert",
+    "n": 1,
+    "size": "1024x1024"
+  }'
+```
+</CodeGroup>
+
+#### Parameters
+
+<ParamField body="model" type="string" required>
+  Image model slug: `nano-banana`, `nano-banana-pro`, `nano-banana-pro-4k`, or `grok-4-image`.
+</ParamField>
+
+<ParamField body="prompt" type="string" required>
+  Text description of the image you want. Up to 4000 characters.
+</ParamField>
+
+<ParamField body="n" type="integer" default="1">
+  Number of images to generate. 1–4.
+</ParamField>
+
+<ParamField body="size" type="string">
+  Output resolution hint forwarded to the upstream, e.g. `1024x1024`, `2048x2048`, `4096x4096`. Nano Banana Pro 4K defaults to 4096.
+</ParamField>
+
+<ParamField body="response_format" type="string" default="b64_json">
+  `b64_json` returns inline PNG base64 (browser-renderable). `url` returns a short-lived upstream URL.
+</ParamField>
+
+<ParamField body="input_images" type="string[]">
+  Optional reference photos for image-to-image / editing. Each entry is a `data:` URL, `https://` URL, or bare base64 string. Supported by the Nano Banana family.
+</ParamField>
+
+<Callout kind="info">
+  If the upstream returns fewer images than requested (content-policy rejects, partial failures, etc.), you are billed only for what was delivered.
+</Callout>
 
 ### Claude Code
 
