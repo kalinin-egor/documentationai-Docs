@@ -7,6 +7,25 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-04-21" description="v3.1.0" tags={["feature", "llm", "api"]}>
+
+## OpenAI-Compatible LLM Endpoint
+
+- **Drop-in OpenAI API** at `/v1/openai/chat/completions` and `/v1/openai/models` — every field of the OpenAI Chat Completions protocol is forwarded unchanged (tools, tool_choice, response_format, logprobs, seed, streaming).
+- **Works with Claude Code** (via LiteLLM proxy), **Cursor**, **Continue.dev**, **Aider**, **LiteLLM**, and the official OpenAI Python / JS SDKs — no code changes required.
+- **Byte-identical SSE streaming** — plug directly into OpenAI SDK's streaming parser.
+- Authenticates with your existing GPUniq API key via `Authorization: Bearer gpuniq_...`.
+
+## Expanded Model Catalog
+
+- **Anthropic Claude** — Opus 4.7 / 4.6 / 4.5, Sonnet 4.6 / 4.5, Haiku 4.5 (now the platform default).
+- **OpenAI GPT-5 family** — GPT-5.2 Pro / Codex, GPT-5.1 Codex Max, GPT-5, o3 / o3-mini / o4-mini, GPT-4o, GPT-4.1.
+- **Google Gemini** — Gemini 3 Pro / Flash, Gemini 2.5, Nano Banana.
+- **xAI Grok** — Grok 4, Grok 4.1 Thinking, Grok 4 Fast.
+- Premium models priced **20% below vendor list price**; 30+ free-tier community models remain available.
+
+</Update>
+
 <Update label="2026-02-28" description="v3.0.0" tags={["feature", "cli"]}>
 
 ## CLI Tool (`gg`)

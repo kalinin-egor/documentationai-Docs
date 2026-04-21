@@ -1,32 +1,181 @@
 ---
 title: LLM API
-description: Access OpenAI, Qwen, DeepSeek, Llama, and other language models through a unified API.
+description: Access Claude, GPT-5, Gemini, Grok, and open-source models through a single API. OpenAI-compatible — works with Claude Code, Cursor, and LiteLLM.
 ---
 
 ## Overview
 
-GPUniq provides access to multiple LLM providers through a single unified API. Send chat completion requests, manage token balance, and maintain persistent chat sessions.
+GPUniq provides a single API surface for 80+ language models across Anthropic, OpenAI, Google, xAI, and the open-source community. One API key, one balance, one usage dashboard.
+
+You can use GPUniq LLMs two ways:
+
+1. **Native GPUniq API** (`/v1/llm/*`) — wrapped responses, persistent chat sessions, terminal-command generator, SDK helpers.
+2. **OpenAI-compatible API** (`/v1/openai/*`) — drop-in replacement for `api.openai.com/v1`. Works with Claude Code, Cursor, Continue.dev, Aider, LiteLLM, and the official OpenAI Python/JS SDKs without code changes.
 
 ## Available Models
 
-```python
-from gpuniq import GPUniq
-client = GPUniq(api_key="gpuniq_your_key")
+| Provider | Models | Best for |
+|----------|--------|----------|
+| **Anthropic** | Claude Opus 4.7 / 4.6 / 4.5, Sonnet 4.6 / 4.5, Haiku 4.5 | General reasoning, coding, agents |
+| **OpenAI** | GPT-5.2 Pro / Codex, GPT-5, o3, o3-mini, GPT-4o, GPT-4.1 | Reasoning, structured output, vision |
+| **Google** | Gemini 3 Pro / Flash, Gemini 2.5, Nano Banana | Long context, fast batch work |
+| **xAI** | Grok 4, Grok 4.1 Thinking, Grok 4 Fast | Real-time knowledge, low latency |
+| **Open-source** | Qwen3, DeepSeek R1, Llama 3.3, Mistral, Gemma, Nemotron | Free tier for prototyping |
 
+Premium models are sold at **20% below vendor list price**. Free-tier models cost zero tokens.
+
+Fetch the live catalog at any time:
+
+<CodeGroup>
+```python Python SDK
 models = client.llm.models()
 for model in models["models"]:
     print(model)
 ```
 
-Models include providers like OpenAI, Qwen, DeepSeek, Meta Llama, Mistral, NVIDIA, and more. The list updates dynamically as new models become available.
+```bash cURL
+curl https://api.gpuniq.com/v1/llm/models/catalog
+```
 
-## Simple Chat
+```bash OpenAI-compatible
+curl https://api.gpuniq.com/v1/openai/models \
+  -H "Authorization: Bearer gpuniq_your_key"
+```
+</CodeGroup>
 
-Send a message and get a response string:
+The default model is **`claude-haiku-4-5`** — fast, cheap, strong at code.
+
+## OpenAI-Compatible Endpoint
+
+Point any OpenAI-compatible tool at GPUniq by setting two environment variables:
+
+```bash
+OPENAI_API_KEY=gpuniq_your_key
+OPENAI_BASE_URL=https://api.gpuniq.com/v1/openai
+```
+
+Every field of the OpenAI Chat Completions protocol is forwarded unchanged: `tools`, `tool_choice`, `response_format`, `logprobs`, `seed`, `stream`, `stream_options`, etc.
+
+### Official OpenAI SDK
+
+<CodeGroup>
+```python Python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="gpuniq_your_key",
+    base_url="https://api.gpuniq.com/v1/openai",
+)
+
+resp = client.chat.completions.create(
+    model="claude-opus-4-7",
+    messages=[{"role": "user", "content": "Write a binary search in Rust."}],
+)
+print(resp.choices[0].message.content)
+```
+
+```javascript Node
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: "gpuniq_your_key",
+  baseURL: "https://api.gpuniq.com/v1/openai",
+});
+
+const resp = await client.chat.completions.create({
+  model: "claude-opus-4-7",
+  messages: [{ role: "user", content: "Write a binary search in Rust." }],
+});
+console.log(resp.choices[0].message.content);
+```
+
+```bash cURL
+curl https://api.gpuniq.com/v1/openai/chat/completions \
+  -H "Authorization: Bearer gpuniq_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-opus-4-7",
+    "messages": [{"role": "user", "content": "Write a binary search in Rust."}]
+  }'
+```
+</CodeGroup>
+
+### Streaming
+
+Set `stream: true` — GPUniq returns a `text/event-stream` with byte-identical OpenAI SSE framing:
+
+```python
+stream = client.chat.completions.create(
+    model="gpt-5.2",
+    messages=[{"role": "user", "content": "Explain MoE in one paragraph."}],
+    stream=True,
+)
+for chunk in stream:
+    delta = chunk.choices[0].delta.content
+    if delta:
+        print(delta, end="", flush=True)
+```
+
+### Claude Code
+
+[Claude Code](https://docs.claude.com/en/docs/claude-code) can route through GPUniq via a [LiteLLM](https://docs.litellm.ai) proxy. Run LiteLLM locally as an Anthropic-compatible front-end for the GPUniq OpenAI endpoint:
+
+```yaml
+# ~/litellm.yaml
+model_list:
+  - model_name: claude-opus-4-7
+    litellm_params:
+      model: openai/claude-opus-4-7
+      api_base: https://api.gpuniq.com/v1/openai
+      api_key: os.environ/GPUNIQ_API_KEY
+```
+
+```bash
+export GPUNIQ_API_KEY=gpuniq_your_key
+litellm --config ~/litellm.yaml --port 4000
+
+# In another shell — point Claude Code at the proxy
+export ANTHROPIC_BASE_URL=http://localhost:4000
+export ANTHROPIC_API_KEY=sk-litellm-anything
+claude
+```
+
+All tokens are billed against your GPUniq balance — no separate Anthropic account required.
+
+### Cursor
+
+**Settings → Models → Override OpenAI Base URL**:
+
+```
+Base URL:  https://api.gpuniq.com/v1/openai
+API Key:   gpuniq_your_key
+Model:     claude-opus-4-7   # or any slug from /v1/openai/models
+```
+
+### Continue.dev / Aider / LiteLLM
+
+Any tool that accepts an `OPENAI_BASE_URL` works the same way:
+
+```bash
+export OPENAI_API_KEY=gpuniq_your_key
+export OPENAI_BASE_URL=https://api.gpuniq.com/v1/openai
+
+aider --model claude-sonnet-4-6
+```
+
+<Callout kind="info">
+  The OpenAI-compat endpoint returns raw OpenAI response objects (not wrapped in GPUniq's `ResponseSchema`). Errors use OpenAI's `{"error": {"message", "type", "code"}}` envelope so SDK retry logic works unchanged.
+</Callout>
+
+## Native GPUniq SDK
+
+For the fullest feature set — persistent chat sessions, USD balance conversion, usage history — use the native API.
+
+### Simple Chat
 
 <CodeGroup>
 ```python Python SDK
-response = client.llm.chat("openai/gpt-oss-120b", "Explain how transformers work")
+response = client.llm.chat("claude-haiku-4-5", "Explain how transformers work")
 print(response)
 ```
 
@@ -36,14 +185,12 @@ curl -X POST "https://api.gpuniq.com/v1/llm/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "messages": [{"role": "user", "content": "Explain how transformers work"}],
-    "model": "openai/gpt-oss-120b"
+    "model": "claude-haiku-4-5"
   }'
 ```
 </CodeGroup>
 
-## Chat Completion (Full)
-
-Send a full message history with parameters:
+### Chat Completion (Full)
 
 ```python
 data = client.llm.chat_completion(
@@ -51,23 +198,24 @@ data = client.llm.chat_completion(
         {"role": "system", "content": "You are a helpful AI assistant."},
         {"role": "user", "content": "What is gradient descent?"},
     ],
-    model="openai/gpt-oss-120b",
+    model="claude-sonnet-4-6",
     temperature=0.7,
     max_tokens=1000,
     top_p=0.9,
 )
 
 print(data["content"])
+print(f"Tokens used: {data['tokens_used']} (cost: {data['cost_rub']} RUB)")
 ```
 
-### Parameters
+#### Parameters
 
 <ParamField body="messages" type="object[]" required>
   List of message objects with `role` ("system", "user", "assistant") and `content`.
 </ParamField>
 
 <ParamField body="model" type="string">
-  Model identifier (e.g., `openai/gpt-oss-120b`).
+  Model slug (e.g., `claude-opus-4-7`, `gpt-5.2`, `gemini-3-pro`). Defaults to `claude-haiku-4-5`.
 </ParamField>
 
 <ParamField body="max_tokens" type="integer">
@@ -84,7 +232,7 @@ print(data["content"])
 
 ## Token Balance
 
-Check your remaining LLM tokens:
+Check remaining tokens — shared pool across all models, drawn down in proportion to each model's real upstream cost:
 
 ```python
 balance = client.llm.balance()
@@ -93,12 +241,18 @@ print(f"Remaining: {balance['tokens_remaining']:,} tokens")
 
 ## Purchase Tokens
 
+Convert USD from your GPUniq balance into LLM tokens at the current rate ($1.50 / 1M tokens by default):
+
+```python
+result = client.llm.convert_balance_to_tokens(amount_usd=5.00)
+print(f"Added {result['tokens_added']:,} tokens")
+```
+
+Legacy ruble packages are still available:
+
 ```python
 # Buy a package
 client.llm.purchase_tokens(package_type="medium")  # small, medium, large
-
-# Or convert rubles to tokens
-client.llm.convert_rubles_to_tokens(ruble_amount=100, tokens_to_add=50000)
 
 # View available packages
 packages = client.llm.packages()
@@ -106,18 +260,22 @@ packages = client.llm.packages()
 
 ## Usage History
 
+Per-request detail with prompt / completion / cached tokens and cost:
+
 ```python
 history = client.llm.usage_history(limit=50, offset=0)
+for log in history["logs"]:
+    print(f"{log['model']}: {log['total_tokens']} tokens — {log['cost_rub']} RUB")
 ```
 
 ## Chat Sessions
 
-Maintain persistent conversations:
+Persistent conversations stored server-side — the model sees the full history on every call:
 
 ```python
 # Create a session
 session = client.llm.create_chat_session(
-    model="openai/gpt-oss-120b",
+    model="claude-sonnet-4-6",
     title="Research Assistant",
 )
 
@@ -143,11 +301,19 @@ client.llm.delete_chat_session(chat_id=session["id"])
 
 ## Generate Terminal Commands
 
-Convert natural language to terminal commands:
+Convert natural language to a ranked list of shell commands with danger annotations:
 
 ```python
 cmds = client.llm.generate_commands(
     prompt="find all Python files larger than 1MB and sort by size",
     max_commands=5,
 )
+for c in cmds["commands"]:
+    print(f"[{c['danger']}] {c['command']}  # {c['description']}")
 ```
+
+## API Key Management
+
+API keys are created from the web dashboard (**LLM API Keys**) and sent as `Authorization: Bearer gpuniq_...` on OpenAI-compat routes, or `X-API-Key: gpuniq_...` on native routes.
+
+Rate limit: **120 req/min per key**, sliding window.

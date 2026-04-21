@@ -187,9 +187,11 @@ client.volumes.delete(volume_id=1)
 
 ## LLM
 
+GPUniq gives you Claude (Opus 4.7, Sonnet 4.6, Haiku 4.5), GPT-5 family, Gemini 3, Grok 4, and 30+ open-source models under one API key. For tools that expect the OpenAI protocol (Claude Code via LiteLLM, Cursor, Continue.dev), use the drop-in [OpenAI-compatible endpoint](/llm#openai-compatible-endpoint) at `https://api.gpuniq.com/v1/openai` instead.
+
 ```python
 # Simple chat
-response = client.llm.chat("openai/gpt-oss-120b", "Explain transformers")
+response = client.llm.chat("claude-haiku-4-5", "Explain transformers")
 print(response)
 
 # Full chat completion with history
@@ -198,7 +200,7 @@ data = client.llm.chat_completion(
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": "Hello!"},
     ],
-    model="openai/gpt-oss-120b",
+    model="claude-haiku-4-5",
     temperature=0.7,
     max_tokens=1000,
 )
@@ -208,7 +210,7 @@ balance = client.llm.balance()
 models = client.llm.models()
 
 # Persistent chat sessions
-session = client.llm.create_chat_session(model="openai/gpt-oss-120b", title="Research")
+session = client.llm.create_chat_session(model="claude-haiku-4-5", title="Research")
 reply = client.llm.send_message(chat_id=session["id"], message="Hello!")
 ```
 
@@ -271,5 +273,5 @@ v1.x code continues to work:
 import gpuniq
 
 client = gpuniq.init("gpuniq_your_key")
-response = client.request("openai/gpt-oss-120b", "Hello!")
+response = client.request("claude-haiku-4-5", "Hello!")
 ```
