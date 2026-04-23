@@ -36,12 +36,52 @@ Image models are billed per returned image, not per token.
 | Grok 4 Image | `grok-4-image` | $0.0352 | xAI image generator |
 
 <Info>
-  Image requests may take **up to ~85 seconds** end-to-end for higher-resolution
-  variants (`nano-banana-2`, `nano-banana-pro`, `nano-banana-pro-4k`). The response
-  is returned as a single JSON body once generation completes — no client-side
-  polling is required. Set your HTTP client timeout to **at least 120 seconds**
-  for these models.
+  For higher-resolution variants (`nano-banana-2`, `nano-banana-pro`,
+  `nano-banana-pro-4k`) use the **job-based API** below — it avoids
+  long-held HTTP connections entirely. The legacy sync endpoint
+  (`POST /v1/llm/images/generations`) still works for `nano-banana` and
+  short jobs, but set your client timeout to at least 120 seconds if
+  you use it for the slower models.
 </Info>
+
+#### Job-based image generation (recommended)
+
+`POST /v1/llm/images/jobs` returns a `job_id` in under a second, and you
+poll `GET /v1/llm/images/jobs/{job_id}` every 2-3 seconds until the
+status is terminal. You are charged only when the completion poll
+returns — a timed-out or failed job costs nothing.
+
+```python Python
+import time, requests
+
+BASE = "https://api.gpuniq.com/v1/llm"
+HEADERS = {"X-API-Key": "gpuniq_your_key"}
+
+# 1. Kickoff
+start = requests.post(
+    f"{BASE}/images/jobs",
+    headers=HEADERS,
+    json={"model": "nano-banana-pro", "prompt": "a cozy cabin at sunrise", "n": 1},
+).json()
+job_id = start["data"]["job_id"]
+
+# 2. Poll
+deadline = time.time() + 150
+while time.time() < deadline:
+    time.sleep(2.5)
+    r = requests.get(f"{BASE}/images/jobs/{job_id}", headers=HEADERS).json()
+    d = r["data"]
+    if d["status"] == "completed":
+        image_b64 = d["image"]["b64_json"]
+        print(f"Cost: ${d['cost_usd']}, balance: ${d['balance_usd']}")
+        break
+    if d["status"] == "failed":
+        print("failed:", d.get("error"))
+        break
+```
+
+Only Nano Banana slugs are accepted on this surface. `n` must be `1` —
+issue separate jobs in parallel for batches.
 
 Chat models are sold at **20% below vendor list price**.
 
