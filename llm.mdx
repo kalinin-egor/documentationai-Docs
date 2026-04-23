@@ -29,10 +29,19 @@ Image models are billed per returned image, not per token.
 
 | Model | Slug | Price / image | Notes |
 |-------|------|---------------|-------|
-| Nano Banana | `nano-banana` | $0.0312 | Fast text-to-image & image-to-image |
+| Nano Banana | `nano-banana` | $0.0312 | Fast text-to-image & image-to-image, 1K |
+| Nano Banana 2 | `nano-banana-2` | $0.0500 | Quality-value generation up to 2K |
 | Nano Banana Pro | `nano-banana-pro` | $0.1072 | Higher quality, ~1K resolution |
 | Nano Banana Pro 4K | `nano-banana-pro-4k` | $0.192 | 4K resolution |
 | Grok 4 Image | `grok-4-image` | $0.0352 | xAI image generator |
+
+<Info>
+  Image requests may take **up to ~85 seconds** end-to-end for higher-resolution
+  variants (`nano-banana-2`, `nano-banana-pro`, `nano-banana-pro-4k`). The response
+  is returned as a single JSON body once generation completes — no client-side
+  polling is required. Set your HTTP client timeout to **at least 120 seconds**
+  for these models.
+</Info>
 
 Chat models are sold at **20% below vendor list price**.
 
@@ -132,8 +141,20 @@ for chunk in stream:
 
 Both API surfaces expose a `/images/generations` endpoint that matches
 OpenAI's `images.generate` protocol. Use it with `nano-banana`,
-`nano-banana-pro`, `nano-banana-pro-4k`, or `grok-4-image`. Billing is
-flat per returned image — no token accounting.
+`nano-banana-2`, `nano-banana-pro`, `nano-banana-pro-4k`, or `grok-4-image`.
+Billing is flat per returned image — no token accounting.
+
+Image requests route through a three-tier reliability chain behind the scenes:
+
+1. **Nano Banana** (priority 1, [apigemini.com](https://apigemini.com))
+2. **CrazyRouter** OpenAI-compatible images endpoint (priority 2)
+3. **OpenRouter** multimodal chat (priority 3, pass-through billing only)
+
+Nano Banana requests use asynchronous upstream processing internally (job
+kickoff + status polling, ~2s interval, 85s budget) so a single HTTP request
+from you stays inside CDN timeout limits. From your perspective it is still
+one synchronous `POST /images/generations` — the response body arrives once
+generation completes (or the service falls through to the next upstream).
 
 <CodeGroup>
 ```python Python (OpenAI SDK)
@@ -195,7 +216,7 @@ curl -X POST https://api.gpuniq.com/v1/openai/images/generations \
 #### Parameters
 
 <ParamField body="model" type="string" required>
-  Image model slug: `nano-banana`, `nano-banana-pro`, `nano-banana-pro-4k`, or `grok-4-image`.
+  Image model slug: `nano-banana`, `nano-banana-2`, `nano-banana-pro`, `nano-banana-pro-4k`, or `grok-4-image`.
 </ParamField>
 
 <ParamField body="prompt" type="string" required>
