@@ -1,26 +1,27 @@
 ---
 title: CLI Client
-description: Manage GPU instances, SSH connections, volumes, and SSH keys from your local terminal.
+description: Rent GPUs, SSH into them, chat with LLMs, generate images, and manage volumes — all from your terminal with the `gg` command.
 ---
 
 ## Overview
 
-The `gg` CLI client runs on your **local machine** (macOS, Linux, Windows) and lets you manage your GPUniq resources without opening a browser. View orders, SSH into instances, manage volumes and SSH keys — all from the terminal.
+The `gg` CLI runs on your **local machine** (macOS, Linux, Windows) and is a complete GPUniq control surface:
 
-**Key features:**
-- One-command SSH into rented GPUs
-- Interactive instance selection with arrow keys
-- Automatic SSH key detection and attachment
-- Volume and SSH key management
-- Cross-platform (macOS, Linux, Windows)
+- **Rent and replace GPUs** with an interactive 2D picker, filters, and a full-width marketplace table
+- **SSH** into instances (always through the `ssh.gpuniq.com` proxy, never a bare provider IP)
+- **LLM chat** — one-shot commands or an interactive REPL
+- **Image generation** — `gg image "a red cat astronaut" -o cat.png`
+- Volume, SSH-key, and billing management
+
+Everything is billed from the same USD balance on your account.
 
 ## Installation
 
 ```bash
-pip install GPUniq
+pip install -U gpuniq
 ```
 
-Requires Python 3.8+. After installation, the `gg` command is available in your terminal.
+Python 3.8+. After installation the `gg` command is available in your terminal.
 
 <Callout kind="info">
   **Windows:** If `gg` is not found after install, use `python -m gpuniq.cli.main` or add your Python Scripts folder to PATH.
@@ -32,189 +33,228 @@ Requires Python 3.8+. After installation, the `gg` command is available in your 
 
 ## Authentication
 
-Authenticate with your GPUniq API key. Get one from the [CLI page](https://gpuniq.com/cli) in your dashboard.
+Paste your API key once. Get one from the [CLI page](https://gpuniq.com/cli) in your dashboard (or from **LLM API Keys** — they're the same keys).
 
 ```bash
-gg login
+gg login                       # hidden prompt
+gg login gpuniq_your_key       # non-interactive
+gg login --api-url https://dev-api.gpuniq.com/v1   # point at staging
 ```
 
-You'll be prompted to enter your API key (hidden input). The key is stored in `~/.gpuniq/config.json`.
-
-You can also pass the key directly:
-
-```bash
-gg login gpuniq_your_key_here
-```
+The key is stored in `~/.gpuniq/config.json`. Run `gg status` any time to see whether you're logged in.
 
 ## Commands
 
-### `gg orders`
+### `gg rent` — interactive GPU rental
 
-List your rented GPU instances with SSH connection details.
+```bash
+gg rent
+```
+
+Opens a full-width flow:
+
+1. **Filter wizard** — GPU model (2D picker by generation: Datacenter / 50XX / 40XX / 30XX / 20XX / 1660 with arrow-key navigation), minimum GPU count, max price / hour, verified-only, sort order.
+2. **Marketplace table** — paginated, adapts columns to your terminal width. Wide terminals show `#`, `GPU`, `CNT`, `VRAM`, `RAM`, `DISK`, `CPU`, `NET ↓/↑`, `LOCATION`, `RELIA`, `AVAIL`, `HOSTING`, `PRICE`, `VER`. Use `[n]` / `[p]` to page, `[f]` to re-open filters, `[s]` to resort.
+3. **Billing plan** — **week** (default), **month**, or **minute**.
+4. **Template** — PyTorch, ComfyUI, vLLM, Ubuntu VM, or a custom Docker image.
+5. **Volume** — pick an existing one, create a new one inline, or skip.
+6. Confirm. If the offer was snapped up by someone else between listing and ordering (HTTP 410), the picker loops back so you don't lose plan / volume choices.
+
+Flags to skip any prompt:
+
+```bash
+gg rent --gpu "RTX 4090" --count 1 --pricing week \
+        --image vastai/pytorch:cuda-12.9.1-auto \
+        --disk 100 --max-price 1.50 --verified
+```
+
+| Flag | Purpose |
+|------|---------|
+| `--gpu <model>` | Pre-filter GPU model string |
+| `--count <n>` | Minimum GPU count |
+| `--max-price <usd>` | Max price per hour |
+| `--sort <order>` | `price-low` / `price-high` / `reliability` / `vram` / `performance` |
+| `--verified` | Only verified providers |
+| `--pricing <plan>` | `minute` / `week` / `month` (default `week`) |
+| `--image <tag>` | Docker image, skips template picker |
+| `--disk <gb>` | Disk size (20-2048) |
+| `--volume-id <id>` | Attach existing volume |
+| `--no-volume` | Skip the volume prompt |
+
+### `gg replace` — swap the GPU on a running instance
+
+```bash
+gg replace             # pick the target instance interactively
+gg replace 142         # replace this specific instance
+```
+
+Flow:
+
+1. Pick the running instance to replace (auto-selected if you only have one).
+2. Browse for a new GPU using the same picker as `gg rent`.
+3. Review the summary (old vs. new, plan, volume, image).
+4. On confirm, the old instance is **destroyed** (DELETE — terminates the provider machine, releases the SSH proxy port, soft-deletes the task) and a new order is placed with the **same billing plan and volume**. The Docker image defaults to the old instance's image so your on-disk data stays usable.
+
+If the first replacement offer is taken between browse and order (410), the picker loops without losing the plan/volume; the old instance is only destroyed once a replacement is committed.
+
+Same flags as `gg rent` — plus a positional `<instance_id>`.
+
+### `gg open` — SSH into an instance
+
+```bash
+gg open                # auto-select or arrow-key menu
+gg open 142            # connect to a specific instance
+```
+
+Before connecting, the CLI:
+
+1. Scans `~/.ssh/*.pub` and offers to attach a matching key that already exists in your account (so password prompts go away).
+2. Calls `POST /v1/instances/{id}/ssh-proxy/ensure` so you connect through `ssh.gpuniq.com:<port>` even on older orders whose proxy allocation failed at order time.
+
+If the backend endpoint can't allocate a proxy, the CLI falls back to the direct host silently.
+
+### `gg orders` — list active instances
 
 ```bash
 gg orders
 ```
 
-**Output:**
-```
-ID       GPU                       STATUS         PRICE/HR     SSH COMMAND
---------------------------------------------------------------------------------
-142      RTX 4090 x2               running        $0.45        ssh root@ssh.gpuniq.com -p 20142
-143      A100 80GB                 running        $1.20        ssh root@ssh.gpuniq.com -p 20143
+```text
+ID      GPU                       STATUS       PRICE/HR    SSH COMMAND
+----------------------------------------------------------------------
+142     RTX 4090 x2               running      $0.45       ssh root@ssh.gpuniq.com -p 20142
+143     A100 80GB                 running      $1.20       ssh root@ssh.gpuniq.com -p 20143
 ```
 
 Shows only active instances (running, starting, provisioning).
 
-### `gg open`
-
-SSH into a rented GPU instance. If you have one instance, it connects immediately. If multiple — select with arrow keys.
+### `gg stop` — stop a running instance
 
 ```bash
-# Auto-select (single instance) or interactive menu
-gg open
-
-# Connect to a specific instance
-gg open 142
+gg stop                # interactive
+gg stop 142            # explicit
 ```
 
-**Interactive selection:**
+Pauses the instance but keeps the task record around. For a permanent destroy (free up the SSH proxy port, etc.) use `gg replace` or delete via the dashboard / SDK.
+
+### `gg llm` — chat with a text model
+
+```bash
+gg llm "Explain CUDA streams in one sentence"     # one-shot, prints answer
+gg llm                                            # interactive REPL
+gg llm --list-models                              # list available text models
+gg llm -m claude-haiku-4-5 --temperature 0.3 "rewrite X..."
 ```
-? Select instance:
-> #142  RTX 4090 x2  (running)  $0.45/hr
-  #143  A100 80GB    (running)  $1.20/hr
+
+In REPL mode:
+- `/exit` or Ctrl-D to quit
+- `/clear` to reset chat history
+
+After each reply, the CLI prints tokens used, USD cost, and remaining balance (suppress with `-q` / `--quiet`).
+
+### `gg image` — generate images
+
+```bash
+gg image "a red cat astronaut on Mars"                        # auto-named PNG in cwd
+gg image "variations" -n 4 -o ./renders/                      # directory target
+gg image "edit me" --input cat.png --model nano-banana-pro --size 2048x2048 -o cat_v2.png
 ```
 
-**Automatic SSH key attachment:** If a matching SSH key is found in `~/.ssh/`, the CLI offers to attach it to the instance before connecting.
+| Flag | Purpose |
+|------|---------|
+| `-o, --output <path>` | File (single image) or directory (multi). Default: auto-named `gpuniq-image-<timestamp>.png` |
+| `-m, --model <slug>` | `nano-banana` (default), `nano-banana-2`, `nano-banana-pro`, `nano-banana-pro-4k`, `grok-4-image` |
+| `-n, --n <count>` | Number of images (1-4) |
+| `--size <WxH>` | e.g. `1024x1024`, `2048x2048`, `4096x4096` |
+| `--quality <hint>` | `standard` / `hd` |
+| `--input <path>` | Reference image (repeat for multiple — enables image-to-image / editing) |
+| `--async` | Force the async-poll path (already the default for Nano Banana slugs) |
 
-### `gg balance`
+For Nano Banana slugs the CLI automatically uses the async-poll surface so you never hit a proxy's ~100s idle-read timeout. It streams job status updates (`pending` → `processing` → `completed`) to stderr so you can see progress.
 
-Show your current account balance.
+### `gg balance` — show USD balance
 
 ```bash
 gg balance
 ```
 
-**Output:**
-```
-$42.50
-```
+Prints your current balance in the account currency (USD / RUB / EUR depending on your profile). This balance pays for GPU rentals, LLM chat, and image generation.
 
-### `gg stop`
-
-Stop a running GPU instance. Requires confirmation.
+### `gg status` — login + session info
 
 ```bash
-# Interactive selection
-gg stop
-
-# Stop specific instance
-gg stop 142
+gg status
 ```
 
-The CLI asks for confirmation before stopping to prevent accidental shutdowns.
+```text
+CLI Login (gg login)
+  Status:     connected
+  API URL:    https://api.gpuniq.com/v1
+  API key:    gpuniq…Abc4
+  Instances:  3 total (1 running on this page)
+```
 
-### `gg ssh-keys`
+Works whether you're logged in as a client (`gg login`) or initialised on a GPU (`gg init`). On a GPU it additionally shows the checkpoint summary.
 
-Manage SSH keys in your GPUniq account.
-
-#### List keys
+### `gg ssh-keys` — manage account SSH keys
 
 ```bash
-gg ssh-keys list
-# or just
-gg ssh-keys
+gg ssh-keys list          # or just: gg ssh-keys
+gg ssh-keys add           # uploads ~/.ssh/id_*.pub (interactive pick if multiple)
 ```
-
-**Output:**
-```
-ID     NAME                      FINGERPRINT                                        ACTIVE
----------------------------------------------------------------------------------------------
-1      id_ed25519                SHA256:abc123...                                   yes
-2      id_rsa                    SHA256:def456...                                   yes
-```
-
-#### Add a key
-
-Upload a local SSH public key to your GPUniq account.
-
-```bash
-gg ssh-keys add
-```
-
-The CLI scans `~/.ssh/` for public keys (`id_ed25519.pub`, `id_rsa.pub`, `id_ecdsa.pub`). If multiple are found, you select which one to upload.
 
 <Callout kind="tip">
-  After adding your SSH key, use `gg open` to connect — it will automatically offer to attach the key to your instance.
+  After `gg ssh-keys add`, running `gg open` will automatically offer to attach the key to your instance before connecting.
 </Callout>
 
-### `gg volumes`
-
-Manage persistent storage volumes.
-
-#### List volumes
+### `gg volumes` — manage persistent storage
 
 ```bash
-gg volumes list
-# or just
-gg volumes
-```
-
-**Output:**
-```
-ID     NAME                      SIZE         USED         STATUS
--------------------------------------------------------------------
-7      my-dataset                50 GB        12.3 GB      active
-8      checkpoints               100 GB       45.6 GB      active
-```
-
-#### Create a volume
-
-```bash
-gg volumes create my-data
-gg volumes create my-data --size 50
-gg volumes create my-data --size 50 --description "Training dataset"
-```
-
-Default size is 10 GB. Maximum 100 GB.
-
-#### Delete a volume
-
-```bash
+gg volumes                                             # list
+gg volumes create my-data --size 50 --description "training data"
 gg volumes delete 7
 ```
 
-Requires confirmation. This permanently deletes the volume and all its data.
+Volume data is S3-backed and auto-syncs between `/workspace`, `/root` on the GPU and the cloud via rclone. Survives `gg replace` so you can swap GPUs without losing state.
 
-## Typical Workflow
+### `gg help`
 
 ```bash
-# 1. Install and authenticate
-pip install GPUniq
+gg help                  # same as gg --help
+```
+
+Unknown commands now print a clear `Error: unknown command '<x>'.` plus full help — they no longer masquerade as the (confusing) "gg not initialized" message.
+
+## Typical workflow
+
+```bash
+# 1. Install, authenticate, add SSH key, create volume
+pip install -U gpuniq
 gg login
-
-# 2. Add your SSH key
 gg ssh-keys add
-
-# 3. Create a volume for persistent data
 gg volumes create training-data --size 50
 
-# 4. Rent a GPU from the web dashboard (gpuniq.com)
-#    or via the Python SDK
+# 2. Rent a GPU interactively
+gg rent --gpu "RTX 4090" --pricing week
 
-# 5. Check your instances
+# 3. Check, connect, work
 gg orders
-
-# 6. Connect to your GPU
 gg open
 
-# 7. When done, stop the instance
-gg stop
+# 4. Between training runs, chat and generate images
+gg llm "summarise the last paper on Gaussian splatting"
+gg image "dashboard hero illustration, vector style" -o hero.png
+
+# 5. Upgrade to a bigger GPU without losing volume data
+gg replace 142 --gpu A100
+
+# 6. When done, stop
+gg stop 142
 ```
 
 ## Configuration
 
-Client config is stored at `~/.gpuniq/config.json`:
+Client config lives at `~/.gpuniq/config.json`:
 
 ```json
 {
@@ -224,8 +264,12 @@ Client config is stored at `~/.gpuniq/config.json`:
 }
 ```
 
-To switch API endpoint (e.g. for development):
+To switch endpoints (e.g. staging):
 
 ```bash
 gg login --api-url https://dev-api.gpuniq.com/v1
 ```
+
+## GPU-side mode
+
+When `gg` runs on a GPU instance (after `gg init <token>`, usually done automatically on deploy), it becomes a command-checkpointing and persistent-service runner. See the **CLI GPU-side** guide for those commands (`gg <command>`, `gg list`, `gg logs`, `gg services`, `gg restart`, `gg replay`).

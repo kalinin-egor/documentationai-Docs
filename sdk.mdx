@@ -187,32 +187,114 @@ client.volumes.delete(volume_id=1)
 
 ## LLM
 
-GPUniq gives you Claude (Opus 4.7, Sonnet 4.6, Haiku 4.5), GPT-5 family, Gemini 3, Grok 4, and 30+ open-source models under one API key. For tools that expect the OpenAI protocol (Claude Code via LiteLLM, Cursor, Continue.dev), use the drop-in [OpenAI-compatible endpoint](/llm#openai-compatible-endpoint) at `https://api.gpuniq.com/v1/openai` instead.
+GPUniq gives you Claude (Opus 4.7, Sonnet 4.6, Haiku 4.5), GPT-5 family, Gemini 3, Grok 4, and 30+ open-source models under one API key. Chat and image generation are both billed directly in USD from `user.balance` — no token pools, no separate top-ups.
+
+For tools that expect the OpenAI protocol (Claude Code via LiteLLM, Cursor, Continue.dev), use the drop-in [OpenAI-compatible endpoint](/llm#openai-compatible-endpoint) at `https://api.gpuniq.com/v1/openai` instead.
+
+### Chat
 
 ```python
-# Simple chat
-response = client.llm.chat("claude-haiku-4-5", "Explain transformers")
-print(response)
+# One-shot
+reply = client.llm.chat("claude-haiku-4-5", "Explain transformers")
+print(reply)
 
-# Full chat completion with history
+# Full completion with history and parameters
 data = client.llm.chat_completion(
     messages=[
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "Hello!"},
+        {"role": "system", "content": "You are a terse assistant."},
+        {"role": "user",   "content": "Hello!"},
     ],
     model="claude-haiku-4-5",
-    temperature=0.7,
+    temperature=0.3,
     max_tokens=1000,
 )
+# data = {"content": "...", "model": "...", "tokens_used": 42,
+#         "cost_usd": 0.0003, "balance_usd": 42.17, "finish_reason": "stop"}
 
-# Token balance and models
-balance = client.llm.balance()
-models = client.llm.models()
+# What's available
+models   = client.llm.models()            # list of text-model slugs
+default  = client.llm.default_model()     # platform default
+catalog  = client.llm.model_catalog()     # full catalog with pricing metadata
 
-# Persistent chat sessions
+# Current USD balance (what pays for chat + images)
+print(client.llm.balance())
+
+# Persistent chat sessions (multi-turn history kept server-side)
 session = client.llm.create_chat_session(model="claude-haiku-4-5", title="Research")
-reply = client.llm.send_message(chat_id=session["id"], message="Hello!")
+client.llm.send_message(chat_id=session["id"], message="Hello!")
+client.llm.list_chat_sessions()
+client.llm.delete_chat_session(chat_id=session["id"])
+
+# Usage history
+client.llm.usage_history(limit=50)
 ```
+
+### Image generation
+
+Text-to-image and image-to-image through Nano Banana, Nano Banana Pro / 4K, and Grok 4 Image. See the [LLM & Image API](/llm) page for model slugs and pricing.
+
+#### Synchronous — fast single images
+
+```python
+result = client.llm.generate_image(
+    "a red cat astronaut on Mars",
+    model="nano-banana",
+    n=1,
+    size="1024x1024",
+    save_to="cat.png",                 # decodes b64_json and writes to disk
+)
+print(result["saved_paths"])           # → ['cat.png']
+print(result["cost_usd"], result["balance_usd"])
+```
+
+#### Async + poll — recommended for Nano Banana
+
+Higher-resolution generations go through a job surface that isn't bound by the proxy's ~100s read timeout. `generate_image_async` handles polling for you.
+
+```python
+result = client.llm.generate_image_async(
+    "isometric cyberpunk city at dusk",
+    model="nano-banana-pro",
+    size="2048x2048",
+    save_to="city.png",
+    on_progress=lambda status, _payload: print("→", status),
+)
+```
+
+#### Image-to-image / editing
+
+Pass references as local paths, `data:` URLs, `https://` URLs, raw bytes, or bare base64 — the SDK inlines local files as data URLs automatically.
+
+```python
+client.llm.generate_image(
+    "same cat but in Tokyo at night, neon reflections",
+    model="nano-banana-pro",
+    input_images=["cat.png", "reference/mood_board.jpg"],
+    size="2048x2048",
+    save_to="cat_tokyo.png",
+)
+```
+
+#### Low-level job control
+
+If you need your own polling / cancellation UI:
+
+```python
+job = client.llm.start_image_job("abstract painting of a neural network", model="nano-banana")
+while True:
+    status = client.llm.get_image_job(job["job_id"])
+    if status["status"] in ("completed", "failed"):
+        break
+    time.sleep(3)
+```
+
+#### `save_to` semantics
+
+- Single image + filename → writes to that path, returns `[path]`.
+- Single image + directory → writes `image_1.png` inside it.
+- Multiple images + filename → appends `_1`, `_2`, … before the extension.
+- Multiple images + directory → writes `image_1.png`, `image_2.png`, …
+- Omit `save_to` to keep base64 payloads in `result["images"]`.
 
 ## Payments
 

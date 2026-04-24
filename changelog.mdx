@@ -7,6 +7,55 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-04-25" description="v3.5.4 — gpuniq SDK" tags={["feature", "sdk", "cli", "llm", "images"]}>
+
+## LLM chat + image generation in the SDK and CLI
+
+The gpuniq Python package (`pip install -U gpuniq`) now ships chat and image-generation helpers, plus matching `gg` subcommands so you never need to leave the terminal.
+
+### Python SDK
+
+- `client.llm.generate_image(prompt, model, n, size, quality, input_images, save_to)` — synchronous text-to-image / image-to-image.
+- `client.llm.start_image_job` / `get_image_job` / `generate_image_async` — job-based surface for Nano Banana (polls automatically, emits `on_progress` callbacks, streams past proxy read-timeouts).
+- `input_images` accepts local paths, `data:` URLs, `https://` URLs, raw bytes, or bare base64 — the SDK inlines local files as data URLs for you.
+- `save_to` accepts a filename (single image) or a directory (many), decodes `b64_json` and writes PNG(s). The list of written paths is returned as `saved_paths`.
+- `client.llm.default_model()` and `model_catalog()` expose the platform default and pricing metadata.
+- Dropped stale `purchase_tokens` / `convert_rubles_to_tokens` / `packages` — LLM and image usage are billed directly in USD from `user.balance`.
+
+### CLI
+
+- `gg llm "prompt"` — one-shot chat, prints the answer plus tokens / cost / balance.
+- `gg llm` — interactive REPL with `/exit`, `/clear`.
+- `gg image "prompt"` — generates image(s), saves PNG(s) to disk, prints paths + cost + balance. Auto-uses the async-poll path for Nano Banana slugs.
+
+</Update>
+
+<Update label="2026-04-25" description="v3.5.2 / 3.5.3 — gpuniq CLI polish" tags={["cli", "ux"]}>
+
+## CLI polish pass
+
+- **`gg help`** now works (alias for `gg --help`). Typos like `gg oders` print a clear `Error: unknown command '<x>'.` + full help instead of the confusing "gg not initialized" message — the shell-fallback only kicks in when a GPU-side `gg init` config actually exists.
+- **2D GPU picker** — arrow-key navigation through a matrix laid out by generation (Datacenter · 50XX · 40XX · 30XX · 20XX · 1660) with `Any GPU` / `Other…` meta rows.
+- **Templates** — docker image presets (PyTorch, ComfyUI, vLLM, Ubuntu VM, Custom). `gg rent` picks PyTorch by default; `gg replace` defaults to the old instance's image so on-disk data keeps working.
+- **`gg open` always goes via `ssh.gpuniq.com`** — the CLI calls a new `POST /v1/instances/{id}/ssh-proxy/ensure` to allocate a proxy port on demand for older orders whose allocation failed at order time.
+- **`gg replace` fully destroys** the old instance (DELETE, not just stop) so the provider machine and SSH proxy port are released before the new one is placed.
+- **Billing plans trimmed** to `week` (default), `month`, and `minute`. Hourly/daily billing is no longer exposed in the rental UI.
+
+</Update>
+
+<Update label="2026-04-24" description="v3.3.0 / 3.4.0 / 3.5.0 / 3.5.1 — gpuniq CLI" tags={["feature", "cli"]}>
+
+## `gg rent` and `gg replace`
+
+- **`gg rent`** — interactive GPU rental from the terminal. Filter wizard (GPU model picker, min count, max price, verified, sort), full-width marketplace table with `n` / `p` / `f` / `s` controls, template picker, volume picker (pick existing / create new / skip), confirm, place order. On HTTP 410 (offer taken mid-flow) the picker loops back without losing plan / volume choices.
+- **`gg replace <id>`** — swap the GPU on a running instance. Same picker, same filters. Preserves the original billing plan and volume; defaults the Docker image to whatever the old instance was running.
+- **Adaptive table** — columns resize with the terminal. Narrow: GPU / VRAM / RAM / DISK / LOCATION / RELIA / PRICE / VER. Wide: adds CPU, NET ↓/↑, AVAIL, CPU MODEL, HOSTING. GPU and LOCATION flex-share leftover width.
+- **`gg status`** recognises both `gg login` (client) and `gg init` (GPU) configs and shows a combined status view.
+- `--image`, `--disk`, `--gpu`, `--count`, `--max-price`, `--sort`, `--pricing`, `--volume-id`, `--no-volume`, `--verified` flags on `gg rent` / `gg replace` for non-interactive use.
+- `OrderOfferGone` typed exception and richer FastAPI error parsing (dict / list / string `detail` shapes) — you see `order failed (400): docker_image is required` instead of `400 Client Error: Bad Request for url`.
+
+</Update>
+
 <Update label="2026-04-21" description="v3.2.0" tags={["feature", "llm", "images"]}>
 
 ## Image Generation
