@@ -1,11 +1,11 @@
 ---
 title: LLM & Image API
-description: Chat, reasoning, and image generation through a single OpenAI-compatible API. Claude, GPT-5, Gemini, Grok, Nano Banana, and more — one key, one balance.
+description: Chat, reasoning, and image generation through a single OpenAI-compatible API. Claude, GPT-5, Gemini, Grok, DeepSeek, Nano Banana, and more — one key, one balance.
 ---
 
 ## Overview
 
-GPUniq provides a single API surface for 80+ language models and image generators across Anthropic, OpenAI, Google, and xAI. One API key, one balance, one usage dashboard — chat completions, reasoning, and text-to-image all in the same place.
+GPUniq provides a single API surface for 90+ language models and image generators across Anthropic, OpenAI, Google, xAI, and DeepSeek. One API key, one balance, one usage dashboard — chat completions, reasoning, and text-to-image all in the same place.
 
 You can use GPUniq LLMs two ways:
 
@@ -22,6 +22,22 @@ You can use GPUniq LLMs two ways:
 | **OpenAI** | GPT-5.2 Pro / Codex, GPT-5, o3, o3-mini, GPT-4o, GPT-4.1 | Reasoning, structured output, vision |
 | **Google** | Gemini 3 Pro / Flash, Gemini 2.5 | Long context, fast batch work |
 | **xAI** | Grok 4, Grok 4.1 Thinking, Grok 4 Fast | Real-time knowledge, low latency |
+| **DeepSeek** | V3.2 / V3.2 Thinking, V3.1 / Terminus, R1 / R1 (May 2025), Reasoner, Chat, OCR | Cost-efficient reasoning, OCR, conversational |
+
+#### DeepSeek pricing (USD per 1M tokens, **already discounted −20%**)
+
+| Slug | Input | Output | Category | Notes |
+|------|-------|--------|----------|-------|
+| `deepseek-v3.2` | $2.16 | $3.24 | flagship | Latest flagship general model |
+| `deepseek-v3.2-thinking` | $0.30 | $0.45 | reasoning | Reasoning-tuned V3.2 (very cheap) |
+| `deepseek-v3.1` | $4.32 | $12.96 | flagship | Previous flagship |
+| `deepseek-v3.1-terminus` | $0.15 | $0.30 | balanced | Updated V3.1, very cheap |
+| `deepseek-v3` | $2.16 | $8.64 | balanced | Original V3 (Dec 2024) |
+| `deepseek-r1` | $4.32 | $17.28 | reasoning | First reasoning model |
+| `deepseek-r1-0528` | $0.59 | $1.81 | reasoning | Updated R1, May 2025 |
+| `deepseek-reasoner` | $0.30 | $0.45 | reasoning | Reasoning-focused alias |
+| `deepseek-chat` | $0.29 | $1.17 | balanced | Conversational alias |
+| `deepseek-ocr` | $0.23 | $0.23 | fast | OCR model |
 
 ### Image Generation
 
