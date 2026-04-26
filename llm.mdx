@@ -19,16 +19,18 @@ You can use GPUniq LLMs two ways:
 | Provider | Models | Best for |
 |----------|--------|----------|
 | **Anthropic** | Claude Opus 4.7 / 4.6 / 4.5, Sonnet 4.6 / 4.5, Haiku 4.5 | General reasoning, coding, agents |
-| **OpenAI** | GPT-5.2 Pro / Codex, GPT-5, o3, o3-mini, GPT-4o, GPT-4.1 | Reasoning, structured output, vision |
+| **OpenAI** | GPT-5.5, GPT-5.2 Pro / Codex, GPT-5, o3, o3-mini, GPT-4o, GPT-4.1 | Reasoning, structured output, vision |
 | **Google** | Gemini 3 Pro / Flash, Gemini 2.5 | Long context, fast batch work |
 | **xAI** | Grok 4, Grok 4.1 Thinking, Grok 4 Fast | Real-time knowledge, low latency |
-| **DeepSeek** | V3.2 / V3.2 Thinking, V3.1 / Terminus, R1 / R1 (May 2025), Reasoner, Chat, OCR | Cost-efficient reasoning, OCR, conversational |
+| **DeepSeek** | V4 Pro / V4 Flash, V3.2 / V3.2 Thinking, V3.1 / Terminus, R1 / R1 (May 2025), Reasoner, Chat, OCR | Cost-efficient reasoning, OCR, conversational |
 | **MiniMax** | M2.7 / M2.5 / M2.1 / M2 | Long-context Chinese & multilingual, balanced cost |
 
 #### DeepSeek pricing (USD per 1M tokens, **already discounted −20%**)
 
 | Slug | Input | Output | Category | Notes |
 |------|-------|--------|----------|-------|
+| `deepseek-v4-pro` | $2.40 | $4.00 | flagship | V4 family flagship |
+| `deepseek-v4-flash` | $0.18 | $0.30 | fast | V4 family fast tier |
 | `deepseek-v3.2` | $2.16 | $3.24 | flagship | Latest flagship general model |
 | `deepseek-v3.2-thinking` | $0.30 | $0.45 | reasoning | Reasoning-tuned V3.2 (very cheap) |
 | `deepseek-v3.1` | $4.32 | $12.96 | flagship | Previous flagship |
@@ -66,8 +68,10 @@ Image models are billed per returned image, not per token.
   `nano-banana-pro-4k`) use the **job-based API** below — it avoids
   long-held HTTP connections entirely. The legacy sync endpoint
   (`POST /v1/llm/images/generations`) still works for `nano-banana` and
-  short jobs, but set your client timeout to at least 120 seconds if
-  you use it for the slower models.
+  short jobs, but Pro / 4K turns occasionally cross 90 seconds and any
+  edge proxy with a 100s idle-read limit (Cloudflare, most CDNs) will
+  cut the response. Use the job API for those and you'll never see a
+  524.
 </Info>
 
 #### Job-based image generation (recommended)
@@ -75,7 +79,9 @@ Image models are billed per returned image, not per token.
 `POST /v1/llm/images/jobs` returns a `job_id` in under a second, and you
 poll `GET /v1/llm/images/jobs/{job_id}` every 2-3 seconds until the
 status is terminal. You are charged only when the completion poll
-returns — a timed-out or failed job costs nothing.
+returns — a timed-out or failed job costs nothing. Server-side, polls
+that arrive within 2 seconds of each other are coalesced via Redis, so
+hammering the endpoint will not be billed as repeated upstream calls.
 
 ```python Python
 import time, requests
@@ -91,8 +97,8 @@ start = requests.post(
 ).json()
 job_id = start["data"]["job_id"]
 
-# 2. Poll
-deadline = time.time() + 150
+# 2. Poll — 5-minute budget covers the slowest Pro / 4K runs
+deadline = time.time() + 300
 while time.time() < deadline:
     time.sleep(2.5)
     r = requests.get(f"{BASE}/images/jobs/{job_id}", headers=HEADERS).json()
@@ -108,6 +114,57 @@ while time.time() < deadline:
 
 Only Nano Banana slugs are accepted on this surface. `n` must be `1` —
 issue separate jobs in parallel for batches.
+
+#### Generating an image inside a chat session
+
+When you want the image to appear as a turn in an existing chat (so the
+prompt and result both land in the chat history), POST to
+`/v1/llm/chats/{chat_id}/messages` with an image model. The response
+returns immediately with `type: "image_pending"` plus a `job_id` and the
+`dialogue_id` of a placeholder row that already lives in the chat
+history. Poll `GET /v1/llm/chats/{chat_id}/image-jobs/{job_id}` until
+the status is `completed` (placeholder is rewritten with the image and
+the balance is debited) or `failed` (placeholder is marked, nothing
+charged). The polling endpoint 404s once the job is terminal — the
+final dialogue is the source of truth from then on.
+
+```python Python
+import time, requests
+
+BASE = "https://api.gpuniq.com/v1/llm"
+HEADERS = {"X-API-Key": "gpuniq_your_key"}
+chat_id = 42  # existing chat created via POST /v1/llm/chats
+
+# 1. Kickoff (POST /chats/{id}/messages with an image model)
+start = requests.post(
+    f"{BASE}/chats/{chat_id}/messages",
+    headers=HEADERS,
+    json={"model": "nano-banana-pro", "message": "a cozy cabin at sunrise"},
+).json()
+job_id = start["data"]["job_id"]
+dialogue_id = start["data"]["dialogue_id"]
+
+# 2. Poll — same 5-minute budget as the standalone /images/jobs flow
+deadline = time.time() + 300
+while time.time() < deadline:
+    time.sleep(2.5)
+    r = requests.get(
+        f"{BASE}/chats/{chat_id}/image-jobs/{job_id}", headers=HEADERS,
+    ).json()
+    d = r["data"]
+    if d["status"] == "completed":
+        image_b64 = d["image"]["b64_json"]
+        print(f"Cost: ${d['cost_usd']}, balance: ${d['balance_usd']}")
+        break
+    if d["status"] == "failed":
+        print("failed:", d.get("error"))
+        break
+```
+
+Use this surface when the image should be part of a multi-turn
+conversation. Use the standalone `/images/jobs` surface when you don't
+need persistence — it has the same job semantics without creating a
+chat row.
 
 Chat models are sold at **20% below vendor list price**.
 

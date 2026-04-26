@@ -7,6 +7,37 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-04-26" description="Chat-image jobs + 5-minute polling budget" tags={["feature", "llm", "images"]}>
+
+## In-chat image generation moves to the job-based pattern
+
+`POST /v1/llm/chats/{chat_id}/messages` with an image model now returns
+in <1s with `type: "image_pending"`, a `job_id`, and the `dialogue_id`
+of a placeholder dialogue that already lives in the chat history.
+
+- New endpoint: `GET /v1/llm/chats/{chat_id}/image-jobs/{job_id}` —
+  poll every 2-3s until `completed` (placeholder is rewritten with the
+  image and balance is debited) or `failed` (placeholder is marked,
+  nothing charged).
+- Pro / 4K turns no longer hit a Cloudflare 524 when they cross 100
+  seconds — the request itself is short, the image arrives over polling.
+- Server-side, polls are coalesced via Redis (2-second TTL), so a
+  client polling every 250ms still costs one upstream call every 2s.
+- Both this and the existing standalone `/v1/llm/images/jobs` flow
+  share the same kickoff / poll / charge code path — pricing, ownership
+  checks, and balance debit are guaranteed to stay in lockstep.
+
+The recommended polling deadline (client-side) is now **5 minutes** for
+either surface. Examples in the [LLM API docs](/llm) updated.
+
+## New chat models
+
+- `gpt-5.5` — OpenAI flagship, 1.40 / 11.20 USD per Mtok
+- `deepseek-v4-pro` — flagship, 2.40 / 4.00
+- `deepseek-v4-flash` — fast tier, 0.18 / 0.30
+
+</Update>
+
 <Update label="2026-04-25" description="v3.5.4 — gpuniq SDK" tags={["feature", "sdk", "cli", "llm", "images"]}>
 
 ## LLM chat + image generation in the SDK and CLI
