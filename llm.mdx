@@ -63,7 +63,7 @@ Image models are billed per returned image, not per token.
 | Nano Banana Pro 4K | `nano-banana-pro-4k` | $0.192 | 4K resolution |
 | Grok 4 Image | `grok-4-image` | $0.0352 | xAI image generator |
 
-<Info>
+<Callout kind="info">
   For higher-resolution variants (`nano-banana-2`, `nano-banana-pro`,
   `nano-banana-pro-4k`) use the **job-based API** below — it avoids
   long-held HTTP connections entirely. The legacy sync endpoint
@@ -72,7 +72,7 @@ Image models are billed per returned image, not per token.
   edge proxy with a 100s idle-read limit (Cloudflare, most CDNs) will
   cut the response. Use the job API for those and you'll never see a
   524.
-</Info>
+</Callout>
 
 #### Job-based image generation (recommended)
 
