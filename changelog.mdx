@@ -12,7 +12,7 @@ description: Track the latest updates and improvements to GPUniq.
 ## In-chat image generation moves to the job-based pattern
 
 `POST /v1/llm/chats/{chat_id}/messages` with an image model now returns
-in <1s with `type: "image_pending"`, a `job_id`, and the `dialogue_id`
+in under 1 second with `type: "image_pending"`, a `job_id`, and the `dialogue_id`
 of a placeholder dialogue that already lives in the chat history.
 
 - New endpoint: `GET /v1/llm/chats/{chat_id}/image-jobs/{job_id}` —
