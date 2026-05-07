@@ -62,16 +62,27 @@ Image models are billed per returned image, not per token.
 | Nano Banana Pro | `nano-banana-pro` | $0.1072 | Higher quality, ~1K resolution |
 | Nano Banana Pro 4K | `nano-banana-pro-4k` | $0.192 | 4K resolution |
 | Grok 4 Image | `grok-4-image` | $0.0352 | xAI image generator |
+| GPT Image 2 | `gpt-image-2` | $0.0464 | OpenAI image, default 1K |
+| GPT Image 1.5 | `gpt-image-1-5` | $0.020 | OpenAI image (cheaper tier) |
+| GPT-4o Image | `gpt-4o-image` | $0.040 | OpenAI 4o image |
+| FLUX.2 Pro | `flux-2-pro` | $0.060 | Black Forest Labs FLUX.2 Pro 1K |
+| FLUX.2 Flex | `flux-2-flex` | $0.180 | Premium quality 1K |
+| Flux Kontext Pro | `flux-kontext-pro` | $0.080 | Text-to-image & edit |
+| Flux Kontext Max | `flux-kontext-max` | $0.160 | Premium edit / generation |
+| Seedream 4 | `seedream-4` | $0.050 | ByteDance Seedream 4 |
+| Seedream 4.5 | `seedream-4-5` | $0.040 | ByteDance Seedream 4.5 |
+| Seedream 5.0 Lite | `seedream-5-0-lite` | $0.035 | ByteDance Seedream 5.0 Lite |
+| Z-Image | `z-image` | $0.020 | Alibaba Z-Image |
 
 <Callout kind="info">
-  For higher-resolution variants (`nano-banana-2`, `nano-banana-pro`,
-  `nano-banana-pro-4k`) use the **job-based API** below — it avoids
-  long-held HTTP connections entirely. The legacy sync endpoint
-  (`POST /v1/llm/images/generations`) still works for `nano-banana` and
-  short jobs, but Pro / 4K turns occasionally cross 90 seconds and any
-  edge proxy with a 100s idle-read limit (Cloudflare, most CDNs) will
-  cut the response. Use the job API for those and you'll never see a
-  524.
+  The synchronous `POST /v1/llm/images/generations` (and its OpenAI-compat
+  twin `POST /v1/openai/images/generations`) holds the connection open
+  for the full 5-minute upstream budget, which is plenty for every model
+  in the catalog. If you sit behind a CDN with a strict idle-read limit
+  (Cloudflare's free tier caps responses at ~100 s) and call from a
+  browser, prefer the **job-based API** below — it returns a `job_id` in
+  under a second and you poll `GET /v1/llm/images/jobs/{job_id}` every
+  2-3 s until completion.
 </Callout>
 
 #### Job-based image generation (recommended)
@@ -263,21 +274,23 @@ for chunk in stream:
 ### Image Generation
 
 Both API surfaces expose a `/images/generations` endpoint that matches
-OpenAI's `images.generate` protocol. Use it with `nano-banana`,
-`nano-banana-2`, `nano-banana-pro`, `nano-banana-pro-4k`, or `grok-4-image`.
-Billing is flat per returned image — no token accounting.
+OpenAI's `images.generate` protocol. Pass any image slug from the
+catalog above (e.g. `nano-banana-pro`, `gpt-image-2`, `flux-2-pro`,
+`seedream-4`). Billing is flat per returned image — no token accounting.
 
-Image requests route through a three-tier reliability chain behind the scenes:
+Image requests route through a multi-tier reliability chain behind the
+scenes: a per-model priority gateway, two cost-optimised intermediaries,
+then a generic OpenAI-compatible fallback for safety. The chain is
+selected automatically per slug, so SDK callers never pick a backend
+themselves. If the primary fails or returns no image, the next tier is
+tried within the same HTTP request — you still see one synchronous
+`POST /images/generations` and pay for delivered images only.
 
-1. **Nano Banana** (priority 1, [apigemini.com](https://apigemini.com))
-2. **CrazyRouter** OpenAI-compatible images endpoint (priority 2)
-3. **OpenRouter** multimodal chat (priority 3, pass-through billing only)
-
-Nano Banana requests use asynchronous upstream processing internally (job
-kickoff + status polling, ~2s interval, 85s budget) so a single HTTP request
-from you stays inside CDN timeout limits. From your perspective it is still
-one synchronous `POST /images/generations` — the response body arrives once
-generation completes (or the service falls through to the next upstream).
+Heavy generations (Pro / 4K, multi-image batches, high-quality preset)
+can run up to **5 minutes** end-to-end; the connection is held open for
+that whole budget so SDKs never need to re-poll. For interactive UIs
+that cannot keep an HTTP connection open that long, prefer the
+[job-based API](#job-based-image-generation-recommended).
 
 <CodeGroup>
 ```python Python (OpenAI SDK)
@@ -339,7 +352,7 @@ curl -X POST https://api.gpuniq.com/v1/openai/images/generations \
 #### Parameters
 
 <ParamField body="model" type="string" required>
-  Image model slug: `nano-banana`, `nano-banana-2`, `nano-banana-pro`, `nano-banana-pro-4k`, or `grok-4-image`.
+  Any image slug from the [catalog](#image-generation): the Nano Banana family, `grok-4-image`, `gpt-image-2`, `gpt-image-1-5`, `gpt-4o-image`, `flux-2-pro`, `flux-2-flex`, `flux-kontext-pro`, `flux-kontext-max`, `seedream-4`, `seedream-4-5`, `seedream-5-0-lite`, or `z-image`.
 </ParamField>
 
 <ParamField body="prompt" type="string" required>
@@ -354,12 +367,26 @@ curl -X POST https://api.gpuniq.com/v1/openai/images/generations \
   Output resolution hint forwarded to the upstream, e.g. `1024x1024`, `2048x2048`, `4096x4096`. Nano Banana Pro 4K defaults to 4096.
 </ParamField>
 
+<ParamField body="quality" type="string">
+  Optional upstream quality hint (e.g. `standard`, `hd`). Models that don't recognise the value silently fall back to their default.
+</ParamField>
+
 <ParamField body="response_format" type="string" default="b64_json">
   `b64_json` returns inline PNG base64 (browser-renderable). `url` returns a short-lived upstream URL.
 </ParamField>
 
+<ParamField body="output_format" type="string">
+  Re-encode every delivered image into this format **on the server** before returning, so the client doesn't need a Pillow / Sharp pipeline. One of:
+
+  - `png` (default if omitted) — pass-through, lossless.
+  - `jpeg` (alias `jpg`) — ~10× smaller payload, alpha is flattened onto white because JPEG has no transparency.
+  - `webp` — ~5× smaller at comparable quality, alpha preserved.
+
+  Quality for the lossy formats is fixed at 92 — visually indistinguishable from the source PNG. Conversion failures degrade to "return source PNG unchanged" so you always get an image, never a 502 after the upstream has done the expensive work. The MIME type of the converted bytes is echoed back in `data[i].mime_type`.
+</ParamField>
+
 <ParamField body="input_images" type="string[]">
-  Optional reference photos for image-to-image / editing. Each entry is a `data:` URL, `https://` URL, or bare base64 string. Supported by the Nano Banana family.
+  Optional reference photos for image-to-image / editing. Each entry is a `data:` URL, `https://` URL, or bare base64 string. Supported by Nano Banana family, GPT Image, FLUX Kontext, Seedream and Nano Banana Pro edit slugs.
 </ParamField>
 
 <Callout kind="info">

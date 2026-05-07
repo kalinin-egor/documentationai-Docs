@@ -7,6 +7,82 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-05-07" description="Image format conversion, 5-min timeouts, expanded image catalog" tags={["feature", "llm", "images"]}>
+
+## Server-side image format conversion
+
+`POST /v1/llm/images/generations` and `POST /v1/openai/images/generations`
+now accept an optional `output_format` field. The server re-encodes
+delivered images into the chosen format before they go over the wire,
+so clients no longer need a Pillow / Sharp pipeline of their own.
+
+- `png` — pass-through (default if omitted), lossless.
+- `jpeg` (alias `jpg`) — ~10× smaller payload; alpha is flattened onto
+  white because JPEG has no transparency.
+- `webp` — ~5× smaller at comparable quality, alpha preserved.
+
+The chosen format is echoed back in `usage.output_format` and each
+delivered image entry carries its `mime_type`. Conversion failures
+degrade to "return source PNG unchanged" so a corrupt encode never
+loses an image the upstream already produced.
+
+## 5-minute upstream timeout across the chain
+
+Long-running reasoning models (Gemini 3 Pro thinking, GPT-5.2 Pro,
+Claude Opus 4.7 thinking, Sora-2 video) that legitimately run for
+several minutes were occasionally cut off mid-generation by a tight
+60-80 s upstream budget and silently re-routed at full official rate.
+The whole LLM stack now holds the connection open for up to **5 minutes
+end-to-end** (10 minutes worst-case if the primary fully exhausts and
+the reliability fallback also takes the full window). In practice we
+never see anything past ~3 minutes, but you'll never lose a slow honest
+generation again.
+
+A dead gateway still fast-fails on TCP connect (10 s) and re-routes
+inside the same request — a 5-minute upper bound is the budget for
+*progress*, not a forced wait.
+
+## Expanded image model catalog
+
+The image-generation endpoint now serves 11 additional models on top of
+the Nano Banana family and Grok 4 Image:
+
+| Slug | Price / image | Notes |
+|------|---------------|-------|
+| `gpt-image-2` | $0.0464 | OpenAI image, 1K default |
+| `gpt-image-1-5` | $0.020 | OpenAI cheaper tier |
+| `gpt-4o-image` | $0.040 | OpenAI 4o image |
+| `flux-2-pro` | $0.060 | Black Forest Labs FLUX.2 Pro 1K |
+| `flux-2-flex` | $0.180 | Premium quality 1K |
+| `flux-kontext-pro` | $0.080 | Text-to-image & edit |
+| `flux-kontext-max` | $0.160 | Premium edit / generation |
+| `seedream-4` | $0.050 | ByteDance Seedream 4 |
+| `seedream-4-5` | $0.040 | ByteDance Seedream 4.5 |
+| `seedream-5-0-lite` | $0.035 | ByteDance Seedream 5.0 Lite |
+| `z-image` | $0.020 | Alibaba Z-Image |
+
+Image-to-image (`input_images`) is supported on the FLUX Kontext,
+Seedream, GPT Image and Nano Banana edit slugs.
+
+## Gemini 3.1 Flash Lite at the standard discount tier
+
+`gemini-3.1-flash-lite` joined the Gemini −20% retail tier:
+
+| | Before | Now |
+|---|---|---|
+| Retail $/MTok | $0.25 / $1.50 | **$0.20 / $1.20** |
+
+Existing API keys see the lower price automatically — no migration
+needed.
+
+## Gemini 3 Pro fallback works again
+
+`gemini-3-pro` requests now have a working fallback chain (the upstream
+alias was previously routing to a missing model and 404-ing). Recovery
+is transparent — same slug, same retail price, no client-side change.
+
+</Update>
+
 <Update label="2026-04-26" description="Chat-image jobs + 5-minute polling budget" tags={["feature", "llm", "images"]}>
 
 ## In-chat image generation moves to the job-based pattern
