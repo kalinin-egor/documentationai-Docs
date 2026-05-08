@@ -213,8 +213,8 @@ mid-generation. Symptoms:
   the 20 KB-25 KB mark, depending on token rate).
 * Backend logs show a `524` from the upstream gateway.
 
-GPUniq surfaces three escape hatches — pick the one that fits your
-client. **Either of them** keeps the connection alive past the 100 s
+GPUniq surfaces four escape hatches — pick the one that fits your
+client. **Any of them** keeps the connection alive past the 100 s
 cap, no plan upgrade or proxy bypass required.
 
 ### 1. Recommended: streaming (`stream: true`)
@@ -253,11 +253,29 @@ curl -N -X POST https://api.gpuniq.com/v1/openai/chat/completions \
 ```
 </CodeGroup>
 
-If you call the OpenAI-compat endpoint with `max_tokens > 4096` and
+If you call the OpenAI-compat endpoint with `max_tokens > 8000` and
 `stream` unset, GPUniq attaches an `X-GPUniq-Warning` response header
-nudging you to switch to streaming.
+nudging you to switch to streaming. You don't *have* to act on it —
+see the auto-aggregate note below — but the warning lets you upgrade
+your client integration when convenient.
 
-### 2. Job-based long-poll API
+### 2. Transparent (default for `max_tokens > 8000`)
+
+When you POST `stream: false` with `max_tokens > 8000`, GPUniq
+**internally upgrades the upstream call to streaming** and reassembles
+the SSE deltas back into a single `chat.completion` JSON before
+returning. From the SDK caller's perspective, nothing changes — you
+still get a blocking JSON response — but the server side keeps the
+upstream connection alive past the 100 s edge cap. No client-side
+code change required; the OpenAI Python / Node SDKs and any HTTP
+client work unchanged.
+
+The trade-off is that you wait for the full generation in one
+response (no progressive UI), so true streaming (option 1) remains
+the right choice for chat UIs. Auto-aggregate is the right choice
+for batch jobs and tool integrations that don't speak SSE.
+
+### 3. Job-based long-poll API
 
 When your client can't speak SSE (legacy stacks, browser extensions
 behind strict CSP, language wrappers without an OpenAI SDK), use the
@@ -320,7 +338,7 @@ minutes**. You only pay when the completion poll returns; a
 client-side timeout that misses the result still bills the same
 amount once the generation finishes.
 
-### 3. Synchronous request without streaming
+### 4. Synchronous request without streaming (≤ 8000 tokens)
 
 The classic non-streaming `POST /v1/openai/chat/completions` still
 works for replies that fit inside the 100 s window — typically
@@ -630,7 +648,7 @@ data = client.llm.chat_completion(
 )
 
 print(data["content"])
-print(f"Tokens used: {data['tokens_used']} (cost: {data['cost_rub']} RUB)")
+print(f"Tokens used: {data['tokens_used']}  cost: ${data['cost_usd']:.6f}")
 ```
 
 #### Parameters
@@ -655,42 +673,40 @@ print(f"Tokens used: {data['tokens_used']} (cost: {data['cost_rub']} RUB)")
   Top-p nucleus sampling parameter.
 </ParamField>
 
-## Token Balance
+## Account Balance
 
-Check remaining tokens — shared pool across all models, drawn down in proportion to each model's real upstream cost:
+Chat and image requests are billed directly against your GPUniq
+account balance in **USD** — there is no separate "token pool"
+anymore. Each call deducts the model's blended retail rate × the
+tokens it actually consumed (or per-image flat rate for image
+models). Prepaid token packages and ruble-to-token conversions are
+no longer required and the corresponding endpoints have been retired.
 
-```python
+<CodeGroup>
+```python Python SDK
 balance = client.llm.balance()
-print(f"Remaining: {balance['tokens_remaining']:,} tokens")
+print(f"Available: ${balance['balance_usd']:.4f} USD")
 ```
 
-## Purchase Tokens
-
-Convert USD from your GPUniq balance into LLM tokens at the current rate ($1.50 / 1M tokens by default):
-
-```python
-result = client.llm.convert_balance_to_tokens(amount_usd=5.00)
-print(f"Added {result['tokens_added']:,} tokens")
+```bash cURL
+curl https://api.gpuniq.com/v1/llm/balance \
+  -H "Authorization: Bearer gpuniq_your_key"
 ```
+</CodeGroup>
 
-Legacy ruble packages are still available:
-
-```python
-# Buy a package
-client.llm.purchase_tokens(package_type="medium")  # small, medium, large
-
-# View available packages
-packages = client.llm.packages()
-```
+Top up the balance from the **web dashboard → Billing** (Stripe / YooKassa / crypto). The balance is shared with every other GPUniq surface — GPU rentals, volume storage, image generations — so a single deposit covers the whole platform.
 
 ## Usage History
 
-Per-request detail with prompt / completion / cached tokens and cost:
+Per-request detail with prompt / completion / cached / reasoning
+tokens and the USD cost charged at retail. Backed by the
+`/v1/llm/usage/history` endpoint; pair it with
+`/v1/llm/usage/breakdown` for daily / weekly aggregates.
 
 ```python
 history = client.llm.usage_history(limit=50, offset=0)
 for log in history["logs"]:
-    print(f"{log['model']}: {log['total_tokens']} tokens — {log['cost_rub']} RUB")
+    print(f"{log['model']}: {log['total_tokens']} tokens — ${log['cost_usd']:.6f}")
 ```
 
 ## Chat Sessions
