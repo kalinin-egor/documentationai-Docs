@@ -1,0 +1,207 @@
+---
+title: Error reference
+description: Complete error catalog for the GPUniq LLM API — HTTP status codes, OpenAI error.type / error.code mappings, what triggers each error, and the right way to recover.
+---
+
+GPUniq's LLM API returns a stable, byte-identical OpenAI error envelope on every failure so the OpenAI SDK's typed exception hierarchy works without special-casing.
+
+## Envelope shape
+
+### OpenAI-compatible (`/v1/openai/*`)
+
+```jsonc
+{
+  "error": {
+    "message": "Human-readable description.",
+    "type": "invalid_request_error",       // for OpenAI SDK exception class
+    "code": "model_not_found",             // stable string — branch on this
+    "doc_url": "https://docs.gpuniq.com/llm/errors",  // optional, where it applies
+    "meta": { "max_tokens": 8000, "limit": 4096 }     // optional, structured details
+  },
+  "status_code": 400,
+  "request_id": "ac30c4c5-62bc-48b5-98ca-bdbd8b4bbaaa"
+}
+```
+
+The `status_code` and `request_id` fields are GPUniq additions — they sit alongside the standard OpenAI `error` object, so an OpenAI SDK consumer never trips on them. `request_id` is the canonical breadcrumb to share with support when reporting an issue.
+
+### Native GPUniq (`/v1/llm/*`)
+
+```jsonc
+{
+  "exception": 400,
+  "data": {
+    "error": "Human-readable description.",
+    "error_code": "model_not_found",
+    "meta": { "max_tokens": 8000, "limit": 4096 }
+  },
+  "message": "Модель не найдена"
+}
+```
+
+The native envelope drops the SDK-typed `error.type` and uses a Russian human-friendly `message` instead, but the `error_code` value is identical to the OpenAI-compat surface — so you can branch on the same string regardless of which surface you call.
+
+## Branching strategy
+
+Always branch on `error.code` (OpenAI) / `data.error_code` (native). The `message` and `type` fields are informational and can change between versions; `code` is the stable contract.
+
+```python
+from openai import OpenAI, BadRequestError, RateLimitError, APIStatusError
+
+client = OpenAI(api_key="gpuniq_…", base_url="https://api.gpuniq.com/v1/openai")
+
+try:
+    resp = client.chat.completions.create(model=…, messages=…)
+except BadRequestError as e:
+    code = e.body.get("error", {}).get("code")
+    if code == "streaming_required":
+        # Retry with stream=true
+        ...
+    elif code == "model_not_found":
+        # Show a "pick a different model" UI
+        ...
+except RateLimitError as e:
+    code = e.body.get("error", {}).get("code")
+    retry_after = e.response.headers.get("Retry-After")
+    # code == "rate_limit_per_key" or "rate_limit_per_user"
+    ...
+```
+
+## Error catalog
+
+The complete list of stable error codes returned by GPUniq.
+
+### Billing & balance
+
+| `code` | HTTP | OpenAI `type` | When |
+|---|---|---|---|
+| `insufficient_balance` | 402 | `insufficient_quota` | Your GPUniq USD balance is below the request's estimated cost. |
+| `billing_temporarily_unavailable` | 503 | `api_error` | Internal billing service is briefly unreachable — request was rejected to avoid silent double-billing. Retry in a few seconds. |
+
+**Recovery:** Top up at [https://gpuniq.com/balance](https://gpuniq.com/balance). The same balance covers GPU rentals, image generation, and chat — one deposit covers the whole platform.
+
+### Authentication & identity
+
+| `code` | HTTP | OpenAI `type` | When |
+|---|---|---|---|
+| `authentication_required` | 401 | `invalid_request_error` | No `Authorization: Bearer …` header and no `X-API-Key`. |
+| `invalid_api_key` | 401 | `invalid_request_error` | The API key is malformed or doesn't exist. |
+| `api_key_revoked` | 401 | `invalid_request_error` | Key existed but was disabled from the dashboard. |
+| `user_not_found` | 404 | `invalid_request_error` | The user account behind this credential no longer exists (rare — only when a credential outlives a hard-delete). |
+
+**Recovery:** Issue a new key at the [LLM API Keys](https://gpuniq.com/dashboard/api-keys) page. Keys are revocable independently — rotating one doesn't invalidate the others.
+
+### Rate limiting
+
+| `code` | HTTP | OpenAI `type` | When |
+|---|---|---|---|
+| `rate_limit_per_key` | 429 | `rate_limit_exceeded` | One API key exceeded its per-minute window. |
+| `rate_limit_per_user` | 429 | `rate_limit_exceeded` | Your user account exceeded the aggregate per-minute window across **all** your API keys. |
+
+The response carries `Retry-After` (seconds), `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers — the OpenAI SDK consumes these automatically for its built-in backoff. The window is a true sliding 60-second one (Redis ZSET), not a fixed-bucket counter, so the limit can't be bypassed at the minute boundary.
+
+**Recovery:** Honour `Retry-After`. If you regularly hit `rate_limit_per_key`, the per-key limit is bumpable from the dashboard. If you hit `rate_limit_per_user`, the aggregate cap is bumpable on request — contact support.
+
+### Model selection
+
+| `code` | HTTP | OpenAI `type` | When |
+|---|---|---|---|
+| `model_not_found` | 400 | `invalid_request_error` | Slug isn't in the GPUniq catalog. Fetch `/v1/openai/models` for the current list. |
+| `model_required` | 400 | `invalid_request_error` | `body.model` is missing or empty. |
+| `model_is_image` | 400 | `invalid_request_error` | You called `/chat/completions` with an image-generation slug. Use `POST /v1/openai/images/generations` instead. |
+| `model_disabled` | 503 | `api_error` | The model is administratively disabled platform-wide. Pick another from the catalog. |
+
+### Request validation
+
+| `code` | HTTP | OpenAI `type` | When |
+|---|---|---|---|
+| `messages_required` | 400 | `invalid_request_error` | `messages` is missing or empty. |
+| `empty_message_content` | 400 | `invalid_request_error` | Any message has whitespace-only or empty content. |
+| `message_too_long` | 400 | `invalid_request_error` | A single message exceeds the maximum allowed length. |
+| `request_too_large` | 413 | `invalid_request_error` | The whole request body exceeds the size cap. |
+| `context_window_exceeded` | 400 | `context_length_exceeded` | Estimated prompt tokens exceed the model's context window. |
+| `invalid_temperature` | 400 | `invalid_request_error` | `temperature` outside `[0, 2]`. |
+| `invalid_top_p` | 400 | `invalid_request_error` | `top_p` outside `[0, 1]`. |
+| `invalid_max_tokens` | 400 | `invalid_request_error` | `max_tokens` ≤ 0 or above the model's output cap. |
+| `invalid_messages_format` | 400 | `invalid_request_error` | A message has an unsupported role or content shape (e.g. malformed multimodal parts). |
+| `invalid_image_payload` | 400 | `invalid_request_error` | Embedded image base64 is malformed or the URL is unreachable. |
+| `content_filter` | 400 | `content_filter` | The upstream blocked the content under its safety policy. |
+
+### Streaming
+
+| `code` | HTTP | OpenAI `type` | When |
+|---|---|---|---|
+| `streaming_required` | 400 | `invalid_request_error` | A non-streaming request asked for more than `NON_STREAM_MAX_TOKENS` output tokens (default **4096**). Buffered responses past that length routinely lose to the ~100 s edge-proxy timeout — retry with `stream: true`. The error's `error.meta` carries `max_tokens`, `limit`, and a `hint` field. |
+
+This is the most common reason a previously-working integration breaks after a GPUniq update. The full recovery recipe lives in the [Long generations](/llm/long-generations) guide.
+
+```jsonc
+// Example response on max_tokens=8000 without stream:
+{
+  "error": {
+    "message": "Requested max_tokens=8000 exceeds the non-streaming limit of 4096. Long responses must use streaming: resend the request with \"stream\": true.",
+    "type": "invalid_request_error",
+    "code": "streaming_required",
+    "doc_url": "https://docs.gpuniq.com/llm/long-generations",
+    "meta": { "max_tokens": 8000, "limit": 4096, "hint": "stream=true" }
+  },
+  "status_code": 400,
+  "request_id": "…"
+}
+```
+
+### Provider / upstream
+
+GPUniq routes every chat completion through a cost-sorted fallback chain of upstream providers. Errors in this section mean the chain itself couldn't satisfy the request — your input is fine, but every viable upstream failed.
+
+| `code` | HTTP | OpenAI `type` | When |
+|---|---|---|---|
+| `provider_unavailable` | 503 | `api_error` | No upstream is currently eligible for this model (every provider disabled or below balance floor). Try another model or retry shortly. |
+| `no_streaming_upstream` | 503 | `api_error` | The model has eligible non-stream upstreams but none of them support real SSE streaming. The request was sent with `stream: true`. |
+| `upstream_timeout` | 504 | `timeout_error` | The upstream took longer than our 5-minute budget or the edge proxy closed the connection. For long reasoning, use `stream: true`. |
+| `upstream_rate_limit` | 429 | `rate_limit_exceeded` | Every upstream for this model is currently rate-limited. Backoff and retry. |
+| `upstream_bad_response` | 502 | `api_error` | All eligible upstreams returned a non-2xx 4xx for this request. |
+| `upstream_server_error` | 502 | `api_error` | All eligible upstreams returned a 5xx. |
+| `gateway_misconfigured` | 503 | `api_error` | The deployment is missing required API keys for any eligible upstream. Operator-visible — contact support. |
+
+**Recovery:** Most upstream errors are transient. The OpenAI SDK's default retry policy handles them automatically; manually, exponential backoff with a 30-second ceiling is enough. `upstream_timeout` on a long generation is the one exception — switching to `stream: true` is the structural fix.
+
+### Catch-all
+
+| `code` | HTTP | OpenAI `type` | When |
+|---|---|---|---|
+| `internal_error` | 500 | `api_error` | Unexpected server-side error — see `request_id` and contact support. |
+
+## Common scenarios
+
+### "I get `streaming_required` on a request that used to work."
+
+`max_tokens > 4096` without `stream: true` is now rejected up-front. Previously, GPUniq would silently upgrade the upstream call to streaming and reassemble the SSE chunks into a non-stream response. That worked for SDKs but ate connections on every Cloudflare-fronted client (browsers, mobile, behind corporate proxies). The new behaviour is to fail fast with a clear error code and `doc_url` so the client can react.
+
+**Fix:** add `"stream": true` to the request body. If your client can't speak SSE, use the [`POST /v1/llm/chat/jobs`](/llm/long-generations#job-based-long-poll-api) job-based pattern instead.
+
+### "I get `insufficient_balance` but my dashboard shows funds."
+
+The pre-flight estimate uses worst-case `max_tokens × retail_output_rate`. A request asking for `max_tokens=4096` against Claude Opus reserves ~$0.08 even before the model has emitted a single token. If you have $0.04 free, the pre-flight rejects with `insufficient_balance` regardless of what the real call would have cost.
+
+**Fix:** keep at least one full request's worth of headroom on the balance, or cap `max_tokens` to a realistic ceiling for the model.
+
+### "I get `upstream_bad_response` randomly."
+
+The cost-sorted chain has tried every eligible provider and each returned a 4xx that wasn't worth retrying through the same provider (usually rate limits from the upstream's own pool). The full chain is exposed in the admin dashboard's **Unit Economics → Streaming Providers** tab.
+
+**Fix:** transient — backoff and retry. If it persists for > 5 minutes on the same model, the operator alert system already fires; contact support.
+
+### "Streaming error chunks in the middle of an SSE stream."
+
+Once the first byte ships, the upstream the chain picked is final — GPUniq doesn't transparently fall over mid-stream. If the upstream then dies, the SSE stream emits a final `data: {"error": {…}}` chunk followed by `data: [DONE]`. Treat that as a partial-success: bill what was delivered, surface the error to the user, and offer a retry.
+
+```jsonc
+data: {"error": {"message": "Upstream gateway is unreachable.", "type": "api_error", "code": "upstream_server_error"}}
+
+data: [DONE]
+```
+
+## Telemetry & support
+
+Every response carries `request_id`. Include it when reporting issues at [support@gpuniq.com](mailto:support@gpuniq.com) — the operator can trace the full upstream chain, provider that served, and source cost in 5 seconds with that one field.

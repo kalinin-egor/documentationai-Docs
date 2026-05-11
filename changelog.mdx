@@ -7,6 +7,95 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-05-11" description="Hardened error envelope, max_tokens > 4096 requires streaming, full provider failover refactor" tags={["feature", "llm", "errors", "breaking"]}>
+
+## Stable error catalog with 29 codes
+
+Every `/v1/openai/*` and `/v1/llm/*` failure now returns a structured
+`error.code` you can branch on — `streaming_required`,
+`insufficient_balance`, `model_not_found`, `rate_limit_per_key`,
+`upstream_timeout`, and 24 more. Full reference, recovery strategies,
+and the native vs. OpenAI-compat envelope shapes are documented at
+[LLM API → Error reference](/llm/errors).
+
+The OpenAI envelope is now byte-identical to the spec — earlier
+deployments emitted a double-wrapped `{"error":{"error":{…}}}` body
+that broke the OpenAI SDK's typed exception parser. That regression
+is fixed: the wire format is `{"error":{message,type,code,doc_url?,meta?}, status_code, request_id}`,
+which lets OpenAI clients raise `BadRequestError`, `RateLimitError`,
+`AuthenticationError` etc. without special-casing.
+
+## `max_tokens > 4096` without `stream: true` is now rejected up-front (BREAKING)
+
+A non-streaming request asking for more than **4096 output tokens** now
+returns HTTP 400 with `error.code = "streaming_required"`. Earlier
+deployments silently upgraded the upstream call to streaming and
+reassembled the SSE chunks into a non-stream response — that worked
+inside SDKs but ate connections on every Cloudflare-fronted client
+(browsers, mobile, behind corporate proxies). The new behaviour fails
+fast with a clear hint:
+
+```jsonc
+{
+  "error": {
+    "message": "Requested max_tokens=8000 exceeds the non-streaming limit of 4096. Long responses must use streaming.",
+    "type": "invalid_request_error",
+    "code": "streaming_required",
+    "meta": { "max_tokens": 8000, "limit": 4096, "hint": "stream=true" },
+    "doc_url": "https://docs.gpuniq.com/llm/long-generations"
+  }
+}
+```
+
+**Migration:** add `"stream": true` to the request body. If your client
+can't speak SSE, use the [job-based long-poll API](/llm/long-generations#job-based-long-poll-api).
+The threshold is configurable per-deployment; the 4096 default is the
+clean intersection of "fits in the 100s edge-proxy window" and "below
+every model's stream-chunk delivery rate".
+
+## Full provider failover chain on non-stream
+
+The non-streaming chat path now iterates the cost-sorted provider chain
+top-to-bottom on transient failures (network errors, upstream 5xx,
+CrazyRouter's `model_not_found` / `insufficient_user_quota` patterns,
+vendor maintenance envelopes). Previously, only the cheapest provider
+was tried before falling straight to CrazyRouter as a safety net —
+middle entries (Packy / GPTProto / APIMart / PoYo / kie.ai) were
+skipped on failover, costing margin and reliability.
+
+The streaming path now uses the same chain iterator. Both paths emit
+exactly ONE operator alert when the chain is fully exhausted (was
+sometimes two per request before).
+
+## kie.ai routes Claude via Anthropic-native `/claude/v1/messages`
+
+For Claude haiku/sonnet/opus 4-5/4-6, the kie.ai provider now serves
+through the Anthropic-native endpoint with real SSE event streaming
+(verified end-to-end on opus 4.6 / sonnet 4.6). Source rates are ~71 %
+off Anthropic list — almost identical to Packy aws-q. The
+redundancy benefit: if Packy throttles, kie.ai picks up at the same
+price point instead of skipping to GPTProto's Bedrock account.
+
+## Sliding-window rate limiter + per-user gate
+
+`core/rate_limiter.py` is now a true Redis ZSET sliding window — the
+previous fixed-bucket implementation let 2× the limit through at the
+minute boundary. A per-user aggregate cap (default 600 req/min)
+fires independently of the per-key cap and surfaces as
+`error.code = "rate_limit_per_user"` so clients can branch on which
+gate triggered.
+
+## Admin → Streaming Providers tab
+
+A new admin tab under **Unit Economics → Streaming Providers** shows
+the live per-model eligibility table: cost / balance / enabled /
+stream-capable flag / reason for every provider in the chain, plus
+the actual stream and non-stream fallback chains the router would
+build right now. Useful when a customer reports an "expected provider
+X, got provider Y" mismatch.
+
+</Update>
+
 <Update label="2026-05-07" description="Image format conversion, 5-min timeouts, expanded image catalog" tags={["feature", "llm", "images"]}>
 
 ## Server-side image format conversion

@@ -72,7 +72,14 @@
       "group": "Platform",
       "pages": [
         "volumes",
-        "llm",
+        {
+          "group": "LLM & Image API",
+          "pages": [
+            "llm",
+            "llm/long-generations",
+            "llm/errors"
+          ]
+        },
         "payments",
         "settings"
       ]

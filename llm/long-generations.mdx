@@ -1,0 +1,181 @@
+---
+title: Long generations
+description: Streaming, job-based polling, and the 4096-token non-streaming limit — how to make GPUniq generate 5000 to 100,000 tokens reliably without hitting the edge-proxy timeout.
+---
+
+The edge proxy in front of GPUniq closes inbound connections after roughly **100 seconds of streaming silence**. That's plenty for a typical chat reply (1-30 s), but Claude / GPT-5 / Gemini Pro turning out 5K+ tokens of free-form prose can take **2-4 minutes** and run into the cap mid-generation. Symptoms:
+
+- Client raises `RemoteDisconnected: Remote end closed connection without response`.
+- The delivered JSON is truncated and fails to parse, often around the 20-25 KB mark depending on token rate.
+- Backend logs show a `524` from the upstream gateway.
+
+## TL;DR
+
+| Your request | What to do |
+|---|---|
+| ≤ 4096 output tokens, fast model | Plain `POST /chat/completions` works. |
+| > 4096 output tokens **OR** slow / reasoning model | **Set `"stream": true`**. |
+| Client can't speak SSE | Use [`POST /v1/llm/chat/jobs`](#job-based-long-poll-api) (long-poll pattern). |
+
+A non-streaming request with `max_tokens > 4096` is **rejected up-front** with HTTP 400 `streaming_required` — the buffered response would lose to the 100-second cap, so we fail fast instead of burning the upstream call. See [errors](/llm/errors#streaming) for the error envelope shape.
+
+## 1. Recommended: streaming
+
+The simplest fix. Cloudflare resets its idle timer on every chunk, so as long as the upstream emits at least one token every couple of seconds the connection survives indefinitely. Every Claude / GPT / Gemini model in the catalog supports this.
+
+<CodeGroup>
+```python OpenAI SDK
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="gpuniq_your_key",
+    base_url="https://api.gpuniq.com/v1/openai",
+)
+
+stream = client.chat.completions.create(
+    model="claude-sonnet-4-6",
+    messages=[{"role": "user", "content": "Write a 10,000 word essay…"}],
+    max_tokens=16384,
+    stream=True,
+)
+
+for chunk in stream:
+    delta = chunk.choices[0].delta.content or ""
+    print(delta, end="", flush=True)
+```
+
+```bash cURL
+curl -N -X POST https://api.gpuniq.com/v1/openai/chat/completions \
+  -H "Authorization: Bearer gpuniq_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"claude-sonnet-4-6","messages":[…],"max_tokens":16384,"stream":true}'
+```
+</CodeGroup>
+
+### What happens under the hood
+
+`stream: true` flips the provider chain to streaming-capable upstreams only: **GPTProto / OpenRouter / APIMart / Packy** (for Claude) and **kie.ai** (for Claude on its Anthropic-native endpoint). Providers that proxy through Cloudflare-style edge buffering get filtered out — their streams die at ~30 s even on internally healthy responses.
+
+Failover within a streaming request is best-effort: once the first byte ships to your client, the upstream is final. If the upstream then dies, the SSE stream emits a final `data: {"error": {…}}` chunk followed by `data: [DONE]`. Treat that as a partial-success — see [errors / streaming error chunks](/llm/errors#streaming-error-chunks-in-the-middle-of-an-sse-stream).
+
+## 2. Hard limit: non-streaming requests are capped at 4096 output tokens
+
+A non-streaming request with `max_tokens > 4096` is **rejected up-front** with HTTP 400:
+
+```jsonc
+{
+  "error": {
+    "message": "Requested max_tokens=8000 exceeds the non-streaming limit of 4096. Long responses must use streaming: resend the request with \"stream\": true.",
+    "type": "invalid_request_error",
+    "code": "streaming_required",
+    "doc_url": "https://docs.gpuniq.com/llm/long-generations",
+    "meta": { "max_tokens": 8000, "limit": 4096, "hint": "stream=true" }
+  },
+  "status_code": 400,
+  "request_id": "…"
+}
+```
+
+This is intentional. Buffered (non-stream) responses past ~3000 output tokens run unacceptably close to the 100-second edge-proxy cap and routinely truncate client-side. Failing fast with a clear `streaming_required` code is more honest than burning the upstream call and returning a half-cooked JSON.
+
+Earlier deployments silently upgraded the upstream call to streaming and reassembled the SSE chunks. That worked for SDKs but ate connections on every Cloudflare-fronted client (browsers, mobile, behind corporate proxies), and was opaque when it broke. **Hard reject with a structured error is the new contract.**
+
+### Migration
+
+If your integration depended on `max_tokens > 4096` without streaming:
+
+```python
+# Before — would 524 mid-generation or get truncated
+resp = client.chat.completions.create(
+    model="claude-sonnet-4-6",
+    messages=[…],
+    max_tokens=10000,
+)
+
+# After — switch to streaming
+stream = client.chat.completions.create(
+    model="claude-sonnet-4-6",
+    messages=[…],
+    max_tokens=10000,
+    stream=True,
+)
+content = "".join(c.choices[0].delta.content or "" for c in stream)
+```
+
+Or use the job-based pattern below if your client can't speak SSE.
+
+## 3. Job-based long-poll API
+
+When your client can't speak SSE (legacy stacks, browser extensions behind strict CSP, language wrappers without an OpenAI SDK), use the **job pattern** modelled on `/v1/llm/images/jobs`. Two short HTTP round-trips instead of one long-held connection.
+
+`POST /v1/llm/chat/jobs` returns a `job_id` in under a second, and you poll `GET /v1/llm/chat/jobs/{job_id}` every 2-3 seconds until the status is terminal. Server-side polls within 2 seconds of each other are coalesced via Redis, so hammering the endpoint will not be charged as repeated upstream calls.
+
+<CodeGroup>
+```python Python
+import time, requests
+
+BASE = "https://api.gpuniq.com/v1/llm"
+H    = {"X-API-Key": "gpuniq_your_key"}
+
+# Kickoff — non-blocking, returns in <1s with a job_id
+job = requests.post(
+    f"{BASE}/chat/jobs",
+    headers=H,
+    json={
+        "model": "claude-sonnet-4-6",
+        "messages": [{"role": "user", "content": "Write a 10,000 word essay…"}],
+        "max_tokens": 16384,
+    },
+).json()["data"]
+job_id = job["job_id"]
+
+# Poll — up to 5 minutes total
+while True:
+    s = requests.get(f"{BASE}/chat/jobs/{job_id}", headers=H).json()["data"]
+    if s["status"] == "completed":
+        print(s["content"])
+        break
+    if s["status"] == "failed":
+        raise RuntimeError(s.get("error"))
+    time.sleep(2)
+```
+
+```bash cURL
+# kickoff
+curl -X POST https://api.gpuniq.com/v1/llm/chat/jobs \
+  -H "X-API-Key: gpuniq_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"claude-sonnet-4-6","messages":[…],"max_tokens":16384}'
+# → {"data":{"job_id":"chatjob_…","status":"pending"}}
+
+# poll every 2-3 s
+curl https://api.gpuniq.com/v1/llm/chat/jobs/chatjob_… \
+  -H "X-API-Key: gpuniq_your_key"
+```
+</CodeGroup>
+
+The job survives client disconnects — once kicked off, generation runs to completion server-side and the result waits in Redis for **15 minutes**. You only pay when the completion poll returns; a client-side timeout that misses the result still bills the same amount once the generation finishes.
+
+## 4. Reasoning models need extra `max_tokens` headroom
+
+Models with hidden chain-of-thought reasoning (Gemini 3 Pro, GPT-5 o3, DeepSeek R1 / V3.2 Thinking, Claude Opus 4.7 thinking) burn tokens on reasoning **before** they emit a single output token. With a tight `max_tokens` you can hit the cap before the model gets to the actual answer:
+
+```jsonc
+{
+  "choices": [{
+    "message": { "role": "assistant", "content": "" },
+    "finish_reason": "length"
+  }],
+  "usage": {
+    "prompt_tokens": 13,
+    "completion_tokens": 50,
+    "completion_tokens_details": { "reasoning_tokens": 50 }
+  }
+}
+```
+
+All 50 tokens went into thinking, none into the visible answer. **Give reasoning models at least 2000-4000 `max_tokens`** to leave room for the chain of thought plus a real reply. The 4096 non-stream cap is usually a poor fit for them — combine `stream: true` with `max_tokens: 8000-16000` instead.
+
+## What used to be here
+
+Earlier versions of this doc described an "auto-aggregate" mode where the server silently upgraded `max_tokens > 8000` non-stream requests to streaming. **That mode has been removed** (commit `3a53f89`, May 2026). The current behaviour is the cleaner contract: non-stream is capped at 4096, anything past that requires explicit `stream: true` or the job-based API.
