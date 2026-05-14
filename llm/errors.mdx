@@ -125,6 +125,7 @@ The response carries `Retry-After` (seconds), `X-RateLimit-Limit`, `X-RateLimit-
 | `invalid_max_tokens` | 400 | `invalid_request_error` | `max_tokens` ≤ 0 or above the model's output cap. |
 | `invalid_messages_format` | 400 | `invalid_request_error` | A message has an unsupported role or content shape (e.g. malformed multimodal parts). |
 | `invalid_image_payload` | 400 | `invalid_request_error` | Embedded image base64 is malformed or the URL is unreachable. |
+| `invalid_request` | 400 | `invalid_request_error` | A required field is missing or violates the endpoint contract — used by image/video/music surfaces where the offending field is named in `error.message`. For video, common cases: i2v slug without `image_url`, motion-control slug without both `image_url` and `video_url`. |
 | `content_filter` | 400 | `content_filter` | The upstream blocked the content under its safety policy. |
 
 ### Streaming
@@ -157,14 +158,113 @@ GPUniq routes every chat completion through a cost-sorted fallback chain of upst
 | `code` | HTTP | OpenAI `type` | When |
 |---|---|---|---|
 | `provider_unavailable` | 503 | `api_error` | No upstream is currently eligible for this model (every provider disabled or below balance floor). Try another model or retry shortly. |
+| `no_provider_available` | 400 | `invalid_request_error` | The requested (model, parameter) combination isn't currently serveable — e.g. you asked for a slug that exists in the catalog but isn't in any upstream's supported-config matrix right now. `meta.attempted_providers` lists which routes were tried. Pick a different combination or check the catalog. |
 | `no_streaming_upstream` | 503 | `api_error` | The model has eligible non-stream upstreams but none of them support real SSE streaming. The request was sent with `stream: true`. |
 | `upstream_timeout` | 504 | `timeout_error` | The upstream took longer than our 5-minute budget or the edge proxy closed the connection. For long reasoning, use `stream: true`. |
 | `upstream_rate_limit` | 429 | `rate_limit_exceeded` | Every upstream for this model is currently rate-limited. Backoff and retry. |
 | `upstream_bad_response` | 502 | `api_error` | All eligible upstreams returned a non-2xx 4xx for this request. |
+| `upstream_validation_error` | 400 | `invalid_request_error` | Every upstream rejected the payload as malformed (image/video/music surfaces). `meta.upstream_message` carries the provider's verbatim reason; `meta.hint` may carry a hand-written remediation. Adjust the request and retry — retrying without changes won't help. |
 | `upstream_server_error` | 502 | `api_error` | All eligible upstreams returned a 5xx. |
 | `gateway_misconfigured` | 503 | `api_error` | The deployment is missing required API keys for any eligible upstream. Operator-visible — contact support. |
 
 **Recovery:** Most upstream errors are transient. The OpenAI SDK's default retry policy handles them automatically; manually, exponential backoff with a 30-second ceiling is enough. `upstream_timeout` on a long generation is the one exception — switching to `stream: true` is the structural fix.
+
+### Async jobs (video / music / image-jobs surfaces)
+
+The async surfaces (`POST /v1/llm/videos/jobs`, `POST /v1/llm/music/jobs`, `POST /v1/llm/images/jobs`) return a stable GPUniq `job_id` on kickoff. The poll endpoint surfaces job state inside a success envelope (`exception: 0`) with `data.status` ∈ `{ pending, processing, completed, failed }`. Only the *envelope-level* errors below are surfaced as non-2xx:
+
+| `code` | HTTP | OpenAI `type` | When |
+|---|---|---|---|
+| `job_not_found` | 404 | `invalid_request_error` | The id doesn't belong to your account, never existed, or fell out of the 60-minute state TTL after kickoff. Re-kick off the job. |
+
+A `data.status: "failed"` payload is **not** an HTTP error — the request itself was valid, the upstream just didn't deliver. The job is no longer pollable after `failed` or `completed`. Re-kick off to retry. Nothing was charged for a `failed` job.
+
+```jsonc
+// GET /v1/llm/videos/jobs/{job_id} — failed (HTTP 200, status:"failed")
+{
+  "exception": 0,
+  "data": {
+    "status": "failed",
+    "job_id": "vid_…",
+    "error": "Upstream task stuck at 0% for 480s — upstream queue likely failed. Retry the request.",
+    "provider_chain": ["kie_video", "poyo"]
+  },
+  "message": "Статус задачи"
+}
+```
+
+### Video-generation specific recipes
+
+Video kickoff errors fold into the tables above, but a few combinations come up often enough that they deserve a named recipe.
+
+**1. `invalid_request` — i2v slug without `image_url`.** Kling 2.1, the Avatar SKUs, and a few others are image-to-video only on the current upstream catalog. The pre-flight check rejects the kickoff with a 400 naming the offending field.
+
+```jsonc
+{
+  "exception": 400,
+  "data": {
+    "error": "`kling-2-1` is an image-to-video model — it requires the `image_url` field. Pass an https URL or `data:` URI.",
+    "error_code": "invalid_request"
+  },
+  "message": "Неверный запрос"
+}
+```
+
+**Fix:** add `image_url` to the request. The same shape applies to motion-control slugs (which require *both* `image_url` and `video_url`).
+
+**2. `upstream_validation_error` — every provider rejected the payload.** Reaches you when the pre-flight check let the request through but the upstream itself bounced it for a contract reason we don't yet model client-side. `meta.upstream_message` is the upstream's verbatim reason; `meta.hint` carries a hand-written remediation when we have one.
+
+```jsonc
+{
+  "exception": 400,
+  "data": {
+    "error": "This SKU is image-to-video — pass an https URL or data: URI via the `image_url` field on the request.",
+    "error_code": "upstream_validation_error",
+    "meta": {
+      "provider": "kie_video",
+      "upstream_status": 422,
+      "hint": "This SKU is image-to-video — pass an https URL or data: URI via the `image_url` field on the request.",
+      "upstream_message": "start_image_url is required"
+    }
+  },
+  "message": "Запрос отклонён провайдером"
+}
+```
+
+**Fix:** read `meta.hint` first — it's pre-translated to GPUniq's request shape. Fall back to `meta.upstream_message` when the hint is null.
+
+**3. `no_provider_available` — the (model, params) combo isn't routeable.** Returned when the slug is in the catalog but the routing layer's cost-and-capability gate filtered every upstream out. Most often: a 4K resolution / master tier / longer-than-supported duration combo that's priced but not yet wired.
+
+```jsonc
+{
+  "exception": 400,
+  "data": {
+    "error": "No provider can currently serve 'kling-2-5-turbo-pro' with the requested config (resolution=4k, audio=false, duration=10, mode=turbo, task=t2v). Either pick a different combination or try again later — the upstream catalog may have shifted.",
+    "error_code": "no_provider_available",
+    "meta": {
+      "slug": "kling-2-5-turbo-pro",
+      "attempted_providers": []
+    }
+  },
+  "message": "Конфигурация не поддерживается"
+}
+```
+
+**Fix:** check the catalog at `GET /v1/llm/models/catalog` for the SKU's currently-supported parameter combinations.
+
+**4. Job stuck — watchdog converts to `failed`.** Some upstream tasks accept the kickoff and never progress past 0% (queue stalls). After 8 minutes at 0%, the poll endpoint emits `status: "failed"` with a `retry the request` hint instead of polling indefinitely until the 60-minute Redis TTL evicts the id.
+
+```jsonc
+{
+  "exception": 0,
+  "data": {
+    "status": "failed",
+    "error": "poyo task stuck at 0% for 482s — upstream queue likely failed. Retry the request."
+  }
+}
+```
+
+**Fix:** re-kick off the job. The stall rate observed in production is ~10-20% on the most-flaky SKUs; healthy jobs complete in 30-90s.
 
 ### Catch-all
 
