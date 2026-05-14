@@ -177,6 +177,150 @@ conversation. Use the standalone `/images/jobs` surface when you don't
 need persistence — it has the same job semantics without creating a
 chat row.
 
+### Video Generation
+
+Video models are billed per delivered video, not per token. Every
+generation is asynchronous — POST to `/v1/llm/videos/jobs` to kick
+off a job, then poll `GET /v1/llm/videos/jobs/{job_id}` until the
+status is terminal. You are charged only when the completion poll
+returns a `video.url` — a failed or timed-out job costs nothing.
+
+| Family | Slug | Headline / video | Notes |
+|--------|------|------------------|-------|
+| OpenAI Sora 2 | `sora-2-video` | $0.060 | Sora 2, default 10s |
+| OpenAI Sora 2 Pro | `sora-2-pro-video` | $1.000 | Premium quality, 10s |
+| Sora 2 Official | `sora-2-official` | $0.480 | 8s, official API |
+| Sora 2 Pro Official | `sora-2-pro-official` | $0.560 | 8s 1080p, official API |
+| Google Veo 3.1 Lite | `veo-3-1-lite` | $0.100 | 720p / 1080p |
+| Google Veo 3.1 Fast | `veo-3-1-fast` | $0.200 | Balanced 720p / 1080p |
+| Google Veo 3.1 Quality | `veo-3-1-quality` | $1.200 | Flagship Google video |
+| Kling 2.1 Pro | `kling-2-1` | $0.405 | Standard / Pro / Master tiers, 5s or 10s, i2v |
+| Kling 2.5 Turbo Pro | `kling-2-5-turbo-pro` | $0.315 | 5s or 10s, t2v / i2v |
+| Kling 2.6 | `kling-2-6` | $0.315 | Optional audio, 5s or 10s, t2v / i2v |
+| Kling 3.0 | `kling-3-0` | $0.504 | 720p / 1080p / 4K, audio, multi-shot to 15s |
+| Kling O3 (Video) | `kling-o3-video` | $0.150 | Premium audio video, 5s |
+| Kling 2.6 Motion Control | `kling-2-6-motion-control` | $0.504 | 720p / 1080p video-to-video |
+| Kling 3.0 Motion Control | `kling-3-0-motion-control` | $0.756 | 720p / 1080p video-to-video |
+| Kling AI Avatar Pro | `kling-avatar-pro` | $1.035 | 1080p lip-sync, up to 15s |
+| Kling AI Avatar Standard | `kling-avatar-standard` | $0.506 | 720p lip-sync, up to 15s |
+| Hailuo 02 | `hailuo-02` | $0.200 | 768p, 6s default |
+| Hailuo 2.3 | `hailuo-2-3` | $0.350 | 768p 6s |
+| Seedance 1.0 Pro | `seedance-1-0-pro` | $0.210 | ByteDance 720p 5s |
+| Seedance 1.5 Pro | `seedance-1-5-pro` | $0.160 | ByteDance 720p 5s |
+| Seedance 2 | `seedance-2` | $0.200 | ByteDance 720p 5s |
+| Alibaba Wan 2.2 Fast | `wan-2-2-fast` | $0.120 | 720p fast tier |
+| Alibaba Wan 2.5 | `wan-2-5` | $0.600 | 720p 5s |
+| Alibaba Wan 2.6 | `wan-2-6` | $0.800 | 720p 5s flagship |
+| Wan Animate | `wan-animate` | $0.150 | 720p animation |
+| Happy Horse | `happy-horse` | $0.160 | 720p |
+| Grok Imagine Video | `grok-imagine-video` | $0.300 | xAI video, 6s |
+| Runway Gen-4.5 | `runway-gen-4-5` | $0.750 | Runway flagship 5s |
+
+<Callout kind="info">
+  **Kling SKUs are billed at −10% off the Fal.ai public price**. The
+  headline above is the cheapest default configuration (1080p / no
+  audio / 5s / Pro tier). Audio, longer duration, 4K, and Master tier
+  scale the price linearly off the underlying Fal rate × 0.9 — the
+  exact cost is returned in the `cost_usd` field of the completion
+  response. A 10% margin floor against the upstream supplier
+  guarantees we never bill below source cost, so on a provider
+  fallback the price may rise by 1-3%.
+</Callout>
+
+#### Job-based video generation
+
+Same kickoff-then-poll shape as the image-jobs API. The catalog covers
+text-to-video (`t2v`), image-to-video (`i2v`, pass `image_url`), and
+video-to-video / motion-control (`v2v`, pass `video_url` + `image_url`
+for the conditioning frame). Avatar SKUs accept an audio reference URL
+in the prompt body — see the model-specific docs for the schema.
+
+```python Python
+import time, requests
+
+BASE = "https://api.gpuniq.com/v1/llm"
+HEADERS = {"X-API-Key": "gpuniq_your_key"}
+
+# 1. Kickoff
+start = requests.post(
+    f"{BASE}/videos/jobs",
+    headers=HEADERS,
+    json={
+        "model": "kling-2-6",
+        "prompt": "A small black cat slowly turns toward the camera at golden hour",
+        "duration": 5,
+        "audio": False,          # opt-in, doubles price on Kling 2.6 / 3.0
+        "resolution": "1080p",   # 720p | 1080p | 4k (where supported)
+    },
+).json()
+job_id = start["data"]["job_id"]
+print(f"chain: {start['data']['provider_chain']}, est cost: ${start['data']['estimated_cost_usd']}")
+
+# 2. Poll — Kling delivers in 30-90s; budget 5 minutes for the slowest variants
+deadline = time.time() + 300
+while time.time() < deadline:
+    time.sleep(3)
+    r = requests.get(f"{BASE}/videos/jobs/{job_id}", headers=HEADERS).json()
+    d = r["data"]
+    if d["status"] == "completed":
+        print(f"video: {d['video']['url']}")
+        print(f"cost: ${d['cost_usd']}, balance: ${d['balance_usd']}")
+        print(f"served by: {d['provider']}")
+        break
+    if d["status"] == "failed":
+        print("failed:", d.get("error"))
+        break
+```
+
+##### Request body
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `model` | string | yes | Slug from the table above. |
+| `prompt` | string | yes | Up to 4000 characters. |
+| `duration` | int | no | Seconds; valid range depends on model (5 / 10 for most Kling, 1-15 for Avatar). |
+| `aspect_ratio` | string | no | `16:9` (default), `9:16`, `1:1` where supported. |
+| `image_url` | string | no | https URL or data URI — enables image-to-video. |
+| `video_url` | string | no | https URL — required for motion-control v2v variants. |
+| `resolution` | string | no | `720p` (default for some SKUs), `1080p` (default for Kling), `4k` (Kling 3.0 only). |
+| `audio` | bool | no | Default `false`. Kling 2.6 / 3.0 double the price when `true`. |
+| `mode` | string | no | `standard` / `pro` (default) / `master` for Kling 2.1; `turbo` for 2.5 Turbo Pro. |
+
+##### Response
+
+The kickoff returns immediately with the GPUniq job id, the resolved
+parameter snapshot, and the upstream provider chain selected for this
+request (cheapest first). The polling endpoint surfaces the current
+upstream and falls back transparently if the provider in flight errors
+out — your `job_id` and the user-facing price stay stable across
+fallbacks.
+
+```jsonc
+// POST /v1/llm/videos/jobs
+{
+  "job_id": "vid_e93e98c7ca5e4982876b",
+  "status": "pending",
+  "model": "kling-2-6",
+  "estimated_cost_usd": 0.315,
+  "provider": "kie_video",
+  "provider_chain": ["kie_video", "poyo"],
+  "config": { "resolution": "1080p", "audio": false, "duration": 5, "task": "t2v", "mode": null }
+}
+
+// GET /v1/llm/videos/jobs/{job_id} — completed
+{
+  "job_id": "vid_e93e98c7ca5e4982876b",
+  "status": "completed",
+  "model": "kling-2-6",
+  "video": { "url": "https://cdn.example.com/.../output.mp4" },
+  "cost_usd": 0.315,
+  "balance_usd": 9.17825791,
+  "provider": "kie_video",
+  "upstream": "kie_video",
+  "config": { "resolution": "1080p", "audio": false, "duration": 5, "task": "t2v", "mode": null }
+}
+```
+
 Chat models are sold at **20% below vendor list price**.
 
 Fetch the live catalog at any time:
