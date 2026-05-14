@@ -33,13 +33,46 @@ The `status_code` and `request_id` fields are GPUniq additions — they sit alon
   "data": {
     "error": "Human-readable description.",
     "error_code": "model_not_found",
-    "meta": { "max_tokens": 8000, "limit": 4096 }
+    "meta": {
+      "max_tokens": 8000,
+      "limit": 4096,
+      "request_id": "ac30c4c5-62bc-48b5-98ca-bdbd8b4bbaaa"
+    }
   },
   "message": "Модель не найдена"
 }
 ```
 
 The native envelope drops the SDK-typed `error.type` and uses a Russian human-friendly `message` instead, but the `error_code` value is identical to the OpenAI-compat surface — so you can branch on the same string regardless of which surface you call.
+
+`data.meta.request_id` is the canonical breadcrumb to include when reporting issues — the same id is echoed back as the `X-Request-ID` response header and is grep-able across logs.
+
+### Pydantic body-validation failures
+
+Field-validation failures on `/v1/llm/*` and `/v1/openai/*` endpoints — missing required fields, out-of-range numbers, wrong enum values — surface as `invalid_request` through the same envelope as everything else, instead of FastAPI's default `{"detail": [...]}` shape. The full Pydantic error list lives in `data.meta.fields` for clients that want machine-readable per-field diagnostics:
+
+```jsonc
+// POST /v1/llm/videos/jobs with prompt=""
+{
+  "exception": 400,
+  "data": {
+    "error": "body.prompt: String should have at least 1 character",
+    "error_code": "invalid_request",
+    "meta": {
+      "fields": [
+        {
+          "type": "string_too_short",
+          "loc": ["body", "prompt"],
+          "msg": "String should have at least 1 character",
+          "ctx": { "min_length": 1 }
+        }
+      ],
+      "request_id": "…"
+    }
+  },
+  "message": "Неверный запрос"
+}
+```
 
 ## Branching strategy
 
