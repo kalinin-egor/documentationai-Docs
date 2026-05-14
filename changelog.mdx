@@ -7,6 +7,83 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-05-14" description="Kling video — multi-provider auto-fallback, parametric −10% off Fal pricing, Avatar SKUs" tags={["feature", "video", "kling", "pricing"]}>
+
+## Production Kling video — cheapest-of-two routing with transparent fallback
+
+Kling video generation now ranks two upstreams per request (kie.ai +
+PoYo) by their parametric source price for the exact `(slug,
+resolution, audio, duration, mode, task)` combination, and falls back
+through the chain transparently if the active upstream errors out
+mid-flight. The GPUniq `job_id` and the user-facing price stay stable
+across fallbacks — clients just keep polling and either get a
+`completed` with the video URL or a final `failed` if every upstream
+rejects.
+
+The response now exposes `provider`, `provider_chain`, and a
+`config` snapshot of the resolved generation parameters so callers
+can see which upstream serviced the job:
+
+```jsonc
+{
+  "job_id": "vid_e93e98c7ca5e4982876b",
+  "status": "completed",
+  "model": "kling-2-6",
+  "video": { "url": "https://cdn.example.com/.../output.mp4" },
+  "cost_usd": 0.315,
+  "balance_usd": 9.17825791,
+  "provider": "kie_video",
+  "config": { "resolution": "1080p", "audio": false, "duration": 5, "task": "t2v", "mode": null }
+}
+```
+
+## Kling retail is now anchored at Fal × 0.90
+
+Every Kling SKU with a published Fal.ai listing is billed at exactly
+**−10% off the Fal public price** for the requested configuration —
+the same headline regardless of which upstream actually served the
+job. A 10% margin floor against the chosen supplier guarantees we
+never bill below source cost, so on a provider fallback the user
+may see a 1-3% price bump but never a freebie. Catalog SKUs surface
+the badge as `discount_percent_label: 10.0` for the frontend to
+render the "−10% off official" tag without hard-coding model lists.
+
+Parametric examples (cheapest provider):
+
+| SKU | Config | Retail | Margin |
+|-----|--------|--------|--------|
+| `kling-2-6` | 5s no-audio | $0.315 | 14.5% |
+| `kling-2-6` | 5s with audio | $0.630 | 14.5% |
+| `kling-3-0` | 1080p+audio 5s | $0.756 | 12% |
+| `kling-3-0` | 4K 5s | $1.890 | 13% |
+| `kling-2-1` | Pro 5s i2v | $0.405 | 170% |
+| `kling-2-6-motion-control` | 1080p 5s v2v | $0.504 | 68% |
+| `kling-avatar-pro` | 10s 1080p | $1.035 | 29% |
+
+## Two new Kling-Avatar SKUs (lip-sync)
+
+`kling-avatar-pro` (1080p) and `kling-avatar-standard` (720p) join
+the catalog for lip-sync avatars up to 15 seconds. Per-second
+billing, kie.ai-exclusive — PoYo doesn't offer lip-sync today.
+
+## Request shape gained `resolution`, `audio`, `mode`, `video_url`
+
+`POST /v1/llm/videos/jobs` accepts four new optional fields used by
+the Kling parametric pricing path:
+
+- `resolution`: `720p` / `1080p` (default) / `4k`
+- `audio`: `true` to enable audio on Kling 2.6 / 3.0 (default `false`)
+- `mode`: `standard` / `pro` / `master` for Kling 2.1; `turbo` for 2.5 Turbo Pro
+- `video_url`: reference video for motion-control `v2v` variants
+
+Non-Kling SKUs (Sora, Veo, Wan, Hailuo, Seedance) ignore the new
+fields — their flat-price catalog path is unchanged, and existing
+callers see no regression.
+
+Full reference: [LLM API → Video Generation](/llm#video-generation).
+
+</Update>
+
 <Update label="2026-05-11" description="Hardened error envelope, max_tokens > 4096 requires streaming, full provider failover refactor" tags={["feature", "llm", "errors", "breaking"]}>
 
 ## Stable error catalog with 29 codes
