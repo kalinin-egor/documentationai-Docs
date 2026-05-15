@@ -191,12 +191,12 @@ GPUniq routes every chat completion through a cost-sorted fallback chain of upst
 | `code` | HTTP | OpenAI `type` | When |
 |---|---|---|---|
 | `provider_unavailable` | 503 | `api_error` | No upstream is currently eligible for this model (every provider disabled or below balance floor). Try another model or retry shortly. |
-| `no_provider_available` | 400 | `invalid_request_error` | The requested (model, parameter) combination isn't currently serveable — e.g. you asked for a slug that exists in the catalog but isn't in any upstream's supported-config matrix right now. `meta.attempted_providers` lists which routes were tried. Pick a different combination or check the catalog. |
+| `no_provider_available` | 400 | `invalid_request_error` | The requested (model, parameter) combination isn't currently serveable — the slug exists in the catalog but no internal route is enabled for it right now. Pick a different combination or check the catalog. |
 | `no_streaming_upstream` | 503 | `api_error` | The model has eligible non-stream upstreams but none of them support real SSE streaming. The request was sent with `stream: true`. |
 | `upstream_timeout` | 504 | `timeout_error` | The upstream took longer than our 5-minute budget or the edge proxy closed the connection. For long reasoning, use `stream: true`. |
 | `upstream_rate_limit` | 429 | `rate_limit_exceeded` | Every upstream for this model is currently rate-limited. Backoff and retry. |
 | `upstream_bad_response` | 502 | `api_error` | All eligible upstreams returned a non-2xx 4xx for this request. |
-| `upstream_validation_error` | 400 | `invalid_request_error` | Every upstream rejected the payload as malformed (image/video/music surfaces). `meta.upstream_message` carries the provider's verbatim reason; `meta.hint` may carry a hand-written remediation. Adjust the request and retry — retrying without changes won't help. |
+| `upstream_validation_error` | 400 | `invalid_request_error` | The internal routing layer rejected the payload as malformed (image/video/music surfaces). `meta.hint` may carry a hand-written remediation pointing at the right field. Adjust the request and retry — retrying without changes won't help. |
 | `upstream_server_error` | 502 | `api_error` | All eligible upstreams returned a 5xx. |
 | `gateway_misconfigured` | 503 | `api_error` | The deployment is missing required API keys for any eligible upstream. Operator-visible — contact support. |
 
@@ -219,8 +219,7 @@ A `data.status: "failed"` payload is **not** an HTTP error — the request itsel
   "data": {
     "status": "failed",
     "job_id": "vid_…",
-    "error": "Upstream task stuck at 0% for 480s — upstream queue likely failed. Retry the request.",
-    "provider_chain": ["kie_video", "poyo"]
+    "error": "Upstream task stuck at 0% for 480s — queue likely failed. Retry the request."
   },
   "message": "Статус задачи"
 }
@@ -245,7 +244,7 @@ Video kickoff errors fold into the tables above, but a few combinations come up 
 
 **Fix:** add `image_url` to the request. The same shape applies to motion-control slugs (which require *both* `image_url` and `video_url`).
 
-**2. `upstream_validation_error` — every provider rejected the payload.** Reaches you when the pre-flight check let the request through but the upstream itself bounced it for a contract reason we don't yet model client-side. `meta.upstream_message` is the upstream's verbatim reason; `meta.hint` carries a hand-written remediation when we have one.
+**2. `upstream_validation_error` — internal routing rejected the payload.** Reaches you when the pre-flight check let the request through but the internal routing layer bounced it for a contract reason we don't yet model client-side. `meta.hint` carries a GPUniq-shaped remediation pointing at the right field.
 
 ```jsonc
 {
@@ -254,29 +253,27 @@ Video kickoff errors fold into the tables above, but a few combinations come up 
     "error": "This SKU is image-to-video — pass an https URL or data: URI via the `image_url` field on the request.",
     "error_code": "upstream_validation_error",
     "meta": {
-      "provider": "kie_video",
-      "upstream_status": 422,
       "hint": "This SKU is image-to-video — pass an https URL or data: URI via the `image_url` field on the request.",
-      "upstream_message": "start_image_url is required"
+      "request_id": "…"
     }
   },
   "message": "Запрос отклонён провайдером"
 }
 ```
 
-**Fix:** read `meta.hint` first — it's pre-translated to GPUniq's request shape. Fall back to `meta.upstream_message` when the hint is null.
+**Fix:** read `meta.hint` first — it's pre-translated to GPUniq's request shape. Adjust the named field and retry.
 
-**3. `no_provider_available` — the (model, params) combo isn't routeable.** Returned when the slug is in the catalog but the routing layer's cost-and-capability gate filtered every upstream out. Most often: a 4K resolution / master tier / longer-than-supported duration combo that's priced but not yet wired.
+**3. `no_provider_available` — the (model, params) combo isn't routeable.** Returned when the slug is in the catalog but no internal route is currently enabled for the requested parameter combination. Most often: a 4K resolution / master tier / longer-than-supported duration combo that's priced but not yet wired.
 
 ```jsonc
 {
   "exception": 400,
   "data": {
-    "error": "No provider can currently serve 'kling-2-5-turbo-pro' with the requested config (resolution=4k, audio=false, duration=10, mode=turbo, task=t2v). Either pick a different combination or try again later — the upstream catalog may have shifted.",
+    "error": "No provider can currently serve 'kling-2-5-turbo-pro' with the requested config (resolution=4k, audio=false, duration=10, mode=turbo, task=t2v). Either pick a different combination or try again later — the catalog may have shifted.",
     "error_code": "no_provider_available",
     "meta": {
       "slug": "kling-2-5-turbo-pro",
-      "attempted_providers": []
+      "request_id": "…"
     }
   },
   "message": "Конфигурация не поддерживается"

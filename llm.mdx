@@ -254,9 +254,9 @@ start = requests.post(
     },
 ).json()
 job_id = start["data"]["job_id"]
-print(f"chain: {start['data']['provider_chain']}, est cost: ${start['data']['estimated_cost_usd']}")
+print(f"job: {job_id}, est cost: ${start['data']['estimated_cost_usd']}")
 
-# 2. Poll — Kling delivers in 30-90s; budget 5 minutes for the slowest variants
+# 2. Poll — video models deliver in 30-90s; budget 5 minutes for the slowest variants
 deadline = time.time() + 300
 while time.time() < deadline:
     time.sleep(3)
@@ -265,7 +265,6 @@ while time.time() < deadline:
     if d["status"] == "completed":
         print(f"video: {d['video']['url']}")
         print(f"cost: ${d['cost_usd']}, balance: ${d['balance_usd']}")
-        print(f"served by: {d['provider']}")
         break
     if d["status"] == "failed":
         print("failed:", d.get("error"))
@@ -289,11 +288,9 @@ while time.time() < deadline:
 ##### Response
 
 The kickoff returns immediately with the GPUniq job id, the resolved
-parameter snapshot, and the upstream provider chain selected for this
-request (cheapest first). The polling endpoint surfaces the current
-upstream and falls back transparently if the provider in flight errors
-out — your `job_id` and the user-facing price stay stable across
-fallbacks.
+parameter snapshot, and the cost estimate. Internal routing is
+opaque — the same `job_id` is valid across fallbacks, and the
+user-facing price stays stable.
 
 ```jsonc
 // POST /v1/llm/videos/jobs
@@ -302,8 +299,6 @@ fallbacks.
   "status": "pending",
   "model": "kling-2-6",
   "estimated_cost_usd": 0.315,
-  "provider": "kie_video",
-  "provider_chain": ["kie_video", "poyo"],
   "config": { "resolution": "1080p", "audio": false, "duration": 5, "task": "t2v", "mode": null }
 }
 
@@ -315,11 +310,11 @@ fallbacks.
   "video": { "url": "https://cdn.example.com/.../output.mp4" },
   "cost_usd": 0.315,
   "balance_usd": 9.17825791,
-  "provider": "kie_video",
-  "upstream": "kie_video",
   "config": { "resolution": "1080p", "audio": false, "duration": 5, "task": "t2v", "mode": null }
 }
 ```
+
+The polling endpoint transparently falls back across internal routes if the first attempt fails — your `job_id` and the user-facing price stay stable across fallbacks. Internal route identifiers are deliberately omitted from the public response; they live only in admin/operator logs.
 
 Chat models are sold at **20% below vendor list price**.
 
