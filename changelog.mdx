@@ -7,6 +7,24 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-05-22" description="gpt-image-2 on the job-based image API — no more long-held connections / CDN timeouts" tags={["feature", "image"]}>
+
+## `gpt-image-2` now works on the job-based image API
+
+`gpt-image-2` is now accepted on `POST /v1/llm/images/jobs` alongside the
+Nano Banana slugs. The job API returns a `job_id` in under a second and
+you poll `GET /v1/llm/images/jobs/{job_id}` until completion, so a slow
+render never holds an HTTP connection open — clients behind a CDN with a
+strict idle-read limit (e.g. Cloudflare's ~100 s cap) no longer see a 524
+on longer generations.
+
+Billing is unchanged and tied to the completion poll: you are charged the
+flat per-image price ($0.0464) only when the image is delivered; a
+timed-out or failed job costs nothing. The synchronous
+`POST /v1/llm/images/generations` endpoint still works for short renders.
+
+</Update>
+
 <Update label="2026-05-14" description="Kling video — multi-provider auto-fallback, parametric −10% off official pricing, Avatar SKUs" tags={["feature", "video", "kling", "pricing"]}>
 
 ## Production Kling video — cheapest-of-two routing with transparent fallback
