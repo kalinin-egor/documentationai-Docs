@@ -567,29 +567,21 @@ curl -X POST https://api.gpuniq.com/v1/openai/images/generations \
 
 ### Claude Code
 
-[Claude Code](https://docs.claude.com/en/docs/claude-code) can route through GPUniq via a [LiteLLM](https://docs.litellm.ai) proxy. Run LiteLLM locally as an Anthropic-compatible front-end for the GPUniq OpenAI endpoint:
-
-```yaml
-# ~/litellm.yaml
-model_list:
-  - model_name: claude-opus-4-7
-    litellm_params:
-      model: openai/claude-opus-4-7
-      api_base: https://api.gpuniq.com/v1/openai
-      api_key: os.environ/GPUNIQ_API_KEY
-```
+[Claude Code](https://docs.claude.com/en/docs/claude-code) talks to GPUniq directly — GPUniq exposes a native Anthropic Messages API at `/v1/messages`, so no LiteLLM (or any other) proxy is required. Point Claude Code's environment variables straight at GPUniq:
 
 ```bash
-export GPUNIQ_API_KEY=gpuniq_your_key
-litellm --config ~/litellm.yaml --port 4000
-
-# In another shell — point Claude Code at the proxy
-export ANTHROPIC_BASE_URL=http://localhost:4000
-export ANTHROPIC_API_KEY=sk-litellm-anything
+export ANTHROPIC_BASE_URL=https://api.gpuniq.com
+export ANTHROPIC_API_KEY=gpuniq_your_key
+export ANTHROPIC_MODEL=claude-opus-4-7              # main model
+export ANTHROPIC_SMALL_FAST_MODEL=claude-haiku-4-5  # background/small model
 claude
 ```
 
-All tokens are billed against your GPUniq balance — no separate Anthropic account required.
+Use any Claude slug from `/v1/openai/models` for the two model variables. Streaming and tool use work out of the box. All tokens are billed against your GPUniq balance — no separate Anthropic account required.
+
+<Note>
+Set `ANTHROPIC_SMALL_FAST_MODEL` too: Claude Code calls a smaller "background" model for things like commit messages and titles. If it points at a slug GPUniq doesn't serve, those background calls fail even when the main model works.
+</Note>
 
 ### Cursor
 
