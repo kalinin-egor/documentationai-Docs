@@ -54,7 +54,7 @@ curl -N -X POST https://api.gpuniq.com/v1/openai/chat/completions \
 
 ### What happens under the hood
 
-`stream: true` flips the provider chain to streaming-capable upstreams only: **GPTProto / OpenRouter / APIMart / Packy** (for Claude) and **kie.ai** (for Claude on its Anthropic-native endpoint). Providers that proxy through Cloudflare-style edge buffering get filtered out — their streams die at ~30 s even on internally healthy responses.
+`stream: true` flips the provider chain to streaming-capable upstreams only (including an Anthropic-native endpoint for Claude). Upstreams that proxy through Cloudflare-style edge buffering get filtered out — their streams die at ~30 s even on internally healthy responses.
 
 Failover within a streaming request is best-effort: once the first byte ships to your client, the upstream is final. If the upstream then dies, the SSE stream emits a final `data: {"error": {…}}` chunk followed by `data: [DONE]`. Treat that as a partial-success — see [errors / streaming error chunks](/llm/errors#streaming-error-chunks-in-the-middle-of-an-sse-stream).
 

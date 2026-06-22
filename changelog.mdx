@@ -7,12 +7,12 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
-<Update label="2026-05-14" description="Kling video — multi-provider auto-fallback, parametric −10% off Fal pricing, Avatar SKUs" tags={["feature", "video", "kling", "pricing"]}>
+<Update label="2026-05-14" description="Kling video — multi-provider auto-fallback, parametric −10% off official pricing, Avatar SKUs" tags={["feature", "video", "kling", "pricing"]}>
 
 ## Production Kling video — cheapest-of-two routing with transparent fallback
 
-Kling video generation now ranks two upstreams per request (kie.ai +
-PoYo) by their parametric source price for the exact `(slug,
+Kling video generation now ranks multiple upstreams per request by
+their parametric source price for the exact `(slug,
 resolution, audio, duration, mode, task)` combination, and falls back
 through the chain transparently if the active upstream errors out
 mid-flight. The GPUniq `job_id` and the user-facing price stay stable
@@ -20,9 +20,8 @@ across fallbacks — clients just keep polling and either get a
 `completed` with the video URL or a final `failed` if every upstream
 rejects.
 
-The response now exposes `provider`, `provider_chain`, and a
-`config` snapshot of the resolved generation parameters so callers
-can see which upstream serviced the job:
+The response now exposes a `config` snapshot of the resolved
+generation parameters:
 
 ```jsonc
 {
@@ -32,39 +31,38 @@ can see which upstream serviced the job:
   "video": { "url": "https://cdn.example.com/.../output.mp4" },
   "cost_usd": 0.315,
   "balance_usd": 9.17825791,
-  "provider": "kie_video",
   "config": { "resolution": "1080p", "audio": false, "duration": 5, "task": "t2v", "mode": null }
 }
 ```
 
-## Kling retail is now anchored at Fal × 0.90
+## Kling retail is now anchored at the official reference price × 0.90
 
-Every Kling SKU with a published Fal.ai listing is billed at exactly
-**−10% off the Fal public price** for the requested configuration —
-the same headline regardless of which upstream actually served the
-job. A 10% margin floor against the chosen supplier guarantees we
-never bill below source cost, so on a provider fallback the user
-may see a 1-3% price bump but never a freebie. Catalog SKUs surface
+Every Kling SKU with a published official reference listing is billed
+at exactly **−10% off the official public price** for the requested
+configuration — the same headline regardless of which upstream
+actually served the job. A 10% margin floor against the chosen
+supplier guarantees we never bill below source cost, so on a provider
+fallback the user may see a 1-3% price bump but never a freebie. Catalog SKUs surface
 the badge as `discount_percent_label: 10.0` for the frontend to
 render the "−10% off official" tag without hard-coding model lists.
 
-Parametric examples (cheapest provider):
+Parametric examples:
 
-| SKU | Config | Retail | Margin |
-|-----|--------|--------|--------|
-| `kling-2-6` | 5s no-audio | $0.315 | 14.5% |
-| `kling-2-6` | 5s with audio | $0.630 | 14.5% |
-| `kling-3-0` | 1080p+audio 5s | $0.756 | 12% |
-| `kling-3-0` | 4K 5s | $1.890 | 13% |
-| `kling-2-1` | Pro 5s i2v | $0.405 | 170% |
-| `kling-2-6-motion-control` | 1080p 5s v2v | $0.504 | 68% |
-| `kling-avatar-pro` | 10s 1080p | $1.035 | 29% |
+| SKU | Config | Retail |
+|-----|--------|--------|
+| `kling-2-6` | 5s no-audio | $0.315 |
+| `kling-2-6` | 5s with audio | $0.630 |
+| `kling-3-0` | 1080p+audio 5s | $0.756 |
+| `kling-3-0` | 4K 5s | $1.890 |
+| `kling-2-1` | Pro 5s i2v | $0.405 |
+| `kling-2-6-motion-control` | 1080p 5s v2v | $0.504 |
+| `kling-avatar-pro` | 10s 1080p | $1.035 |
 
 ## Two new Kling-Avatar SKUs (lip-sync)
 
 `kling-avatar-pro` (1080p) and `kling-avatar-standard` (720p) join
 the catalog for lip-sync avatars up to 15 seconds. Per-second
-billing, kie.ai-exclusive — PoYo doesn't offer lip-sync today.
+billing; lip-sync is currently served by a single upstream only.
 
 ## Request shape gained `resolution`, `audio`, `mode`, `video_url`
 
@@ -134,24 +132,23 @@ every model's stream-chunk delivery rate".
 
 The non-streaming chat path now iterates the cost-sorted provider chain
 top-to-bottom on transient failures (network errors, upstream 5xx,
-CrazyRouter's `model_not_found` / `insufficient_user_quota` patterns,
+`model_not_found` / `insufficient_user_quota` patterns,
 vendor maintenance envelopes). Previously, only the cheapest provider
-was tried before falling straight to CrazyRouter as a safety net —
-middle entries (Packy / GPTProto / APIMart / PoYo / kie.ai) were
+was tried before falling straight to the safety-net upstream —
+the middle entries of the chain were
 skipped on failover, costing margin and reliability.
 
 The streaming path now uses the same chain iterator. Both paths emit
 exactly ONE operator alert when the chain is fully exhausted (was
 sometimes two per request before).
 
-## kie.ai routes Claude via Anthropic-native `/claude/v1/messages`
+## Claude now streams via an Anthropic-native endpoint
 
-For Claude haiku/sonnet/opus 4-5/4-6, the kie.ai provider now serves
-through the Anthropic-native endpoint with real SSE event streaming
-(verified end-to-end on opus 4.6 / sonnet 4.6). Source rates are ~71 %
-off Anthropic list — almost identical to Packy aws-q. The
-redundancy benefit: if Packy throttles, kie.ai picks up at the same
-price point instead of skipping to GPTProto's Bedrock account.
+For Claude haiku/sonnet/opus 4-5/4-6, requests now serve through an
+Anthropic-native endpoint with real SSE event streaming
+(verified end-to-end on opus 4.6 / sonnet 4.6). A redundant upstream
+was added at the same price point, so if one upstream throttles
+another picks up without a price change — improving reliability.
 
 ## Sliding-window rate limiter + per-user gate
 
