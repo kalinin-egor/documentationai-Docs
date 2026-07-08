@@ -208,9 +208,9 @@ returns a `video.url` — a failed or timed-out job costs nothing.
 | Kling AI Avatar Standard | `kling-avatar-standard` | $0.506 | 720p lip-sync, up to 15s |
 | Hailuo 02 | `hailuo-02` | $0.200 | 768p, 6s default |
 | Hailuo 2.3 | `hailuo-2-3` | $0.350 | 768p 6s |
-| Seedance 1.0 Pro | `seedance-1-0-pro` | $0.210 | ByteDance 720p 5s |
-| Seedance 1.5 Pro | `seedance-1-5-pro` | $0.160 | ByteDance 720p 5s |
-| Seedance 2 | `seedance-2` | $0.200 | ByteDance 720p 5s |
+| Seedance 1.0 Pro | `seedance-1-0-pro` | $0.210 | ByteDance 720p, 5s, t2v + i2v (per video) |
+| Seedance 1.5 Pro | `seedance-1-5-pro` | $0.160 | ByteDance 720p, 5s, t2v + i2v (per video) |
+| Seedance 2 | `seedance-2` | $0.33 / s | ByteDance 720p, **billed per second** (5s ≈ $1.65) |
 | Alibaba Wan 2.2 Fast | `wan-2-2-fast` | $0.120 | 720p fast tier |
 | Alibaba Wan 2.5 | `wan-2-5` | $0.600 | 720p 5s |
 | Alibaba Wan 2.6 | `wan-2-6` | $0.800 | 720p 5s flagship |
@@ -229,6 +229,83 @@ returns a `video.url` — a failed or timed-out job costs nothing.
   guarantees we never bill below source cost, so on a provider
   fallback the price may rise by 1-3%.
 </Callout>
+
+#### Seedance (ByteDance)
+
+Seedance is ByteDance's text-to-video / image-to-video family — fast,
+photoreal 720p clips, well suited to product shots, social content, and
+image-to-video animation of a still frame. Three SKUs are in the
+catalog, and they do **not** all price the same way, so read this before
+budgeting a batch.
+
+| Slug | Model | Resolution | Default duration | Modes | Billing |
+|------|-------|------------|------------------|-------|---------|
+| `seedance-1-0-pro` | Seedance 1.0 Pro | 720p | 5s | t2v, i2v | **Flat $0.210 / video** |
+| `seedance-1-5-pro` | Seedance 1.5 Pro | 720p | 5s | t2v, i2v | **Flat $0.160 / video** |
+| `seedance-2` | Seedance 2 | 720p | 5s | t2v, i2v | **Per second — $0.33 / s** |
+
+<Callout kind="warning">
+  **`seedance-2` is billed per second of generated video, not per
+  clip.** A 5-second generation (the default) costs 5 × $0.33 =
+  **$1.65**; a 10-second generation costs **$3.30**. The two `-pro`
+  SKUs, by contrast, are a flat per-video price regardless of duration.
+  Always read the `cost_usd` field of the completion response for the
+  exact amount charged — and the `estimated_cost_usd` on the kickoff
+  response, which already accounts for the duration you requested.
+</Callout>
+
+**Choosing between them:**
+
+- **`seedance-1-5-pro`** — cheapest ($0.160/clip), newest of the "pro"
+  tier. Best default for short 720p clips where you want a fixed,
+  predictable price.
+- **`seedance-1-0-pro`** — the previous pro model ($0.210/clip); keep
+  using it only if you've tuned prompts against it.
+- **`seedance-2`** — the flagship quality tier. Priced per second, so it
+  scales with clip length — reach for it when quality matters more than
+  cost, and keep durations short to control spend.
+
+**Text-to-video** (default) needs only a `prompt`. **Image-to-video**
+animates a still: pass `image_url` (an `https` URL or `data:` URI) as
+the start frame. All three Seedance SKUs support both.
+
+```python Python
+import time, requests
+
+BASE = "https://api.gpuniq.com/v1/llm"
+HEADERS = {"X-API-Key": "gpuniq_your_key"}
+
+# Image-to-video with the flagship, 6-second clip
+start = requests.post(
+    f"{BASE}/videos/jobs",
+    headers=HEADERS,
+    json={
+        "model": "seedance-2",
+        "prompt": "the product slowly rotates on a marble pedestal, soft studio light",
+        "image_url": "https://example.com/product.jpg",  # start frame → image-to-video
+        "duration": 6,          # seedance-2 bills per second → 6 × $0.33 = $1.98
+    },
+).json()["data"]
+job_id = start["job_id"]
+print("estimated:", start["estimated_cost_usd"])   # 1.98
+
+deadline = time.time() + 300
+while time.time() < deadline:
+    time.sleep(3)
+    d = requests.get(f"{BASE}/videos/jobs/{job_id}", headers=HEADERS).json()["data"]
+    if d["status"] == "completed":
+        print("video:", d["video"]["url"], "cost:", d["cost_usd"])
+        break
+    if d["status"] == "failed":
+        print("failed:", d.get("error"))
+        break
+```
+
+Seedance shares the standard [video job API](#video-generation) —
+`duration` and `image_url` are the two fields that matter for it;
+`aspect_ratio` is honoured where the upstream supports it. Fields
+specific to other families (`audio`, `mode`, `resolution` tiers,
+`video_url` motion-control) are ignored by Seedance.
 
 #### Job-based video generation
 
