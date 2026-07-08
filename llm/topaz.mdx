@@ -1,0 +1,259 @@
+---
+title: Topaz upscaling
+description: Gigapixel-class image enhancement and Video AI upscaling to 4K / 60 fps through the GPUniq media API — flat per-image and per-second pricing, job-based delivery, pay only for delivered results.
+---
+
+GPUniq serves **Topaz Labs** production enhancement models — the same
+engines behind Gigapixel AI and Video AI — on the standard GPUniq media
+surfaces. There is no prompt engineering involved: you send a source
+image or video, pick the target scale / resolution, and receive the
+enhanced result. One API key, the same USD balance, the same job
+semantics as every other image and video model in the catalog.
+
+| Model | Slug | Price | Task |
+|-------|------|-------|------|
+| Topaz Image Upscale | `topaz-image-upscale` | $0.05 / image | Image enhance + upscale (2× / 4× / 8×) |
+| Topaz Video Upscale | `topaz-video-upscale` | $0.06 / source second (1080p) · $0.12 (4K) | Video upscale, optional 60 fps interpolation |
+
+<Callout kind="info">
+  Like every media model on GPUniq, Topaz jobs are **billed only when
+  the completion poll returns a result** — a failed or timed-out job
+  costs nothing. The exact amount charged is returned in the
+  `cost_usd` field of the completion response.
+</Callout>
+
+## Image upscaling
+
+`topaz-image-upscale` is available on both image surfaces:
+
+- **Job-based** (recommended): `POST /v1/llm/images/jobs` → poll
+  `GET /v1/llm/images/jobs/{job_id}` every 2-3 s.
+- **Synchronous**: `POST /v1/llm/images/generations` (and its
+  OpenAI-compat twin `POST /v1/openai/images/generations`) — the
+  connection is held open for the full 5-minute budget.
+
+The source image goes in `input_images` (exactly one entry). `prompt`
+is **optional and ignored** by the model — Topaz is a restoration
+engine, not a generator, so the output always stays faithful to the
+source.
+
+<CodeGroup>
+```python Python (job-based)
+import base64, time, requests
+
+BASE = "https://api.gpuniq.com/v1/llm"
+HEADERS = {"X-API-Key": "gpuniq_your_key"}
+
+with open("old_photo.jpg", "rb") as fh:
+    src = "data:image/jpeg;base64," + base64.b64encode(fh.read()).decode()
+
+# 1. Kickoff
+start = requests.post(
+    f"{BASE}/images/jobs",
+    headers=HEADERS,
+    json={
+        "model": "topaz-image-upscale",
+        "input_images": [src],
+        "scale": 4,               # 2 (default) | 4 | 8
+        "face_recovery": True,    # restore faces on old / compressed sources
+        "output_format": "jpeg",  # smaller payload for large upscales
+    },
+).json()
+job_id = start["data"]["job_id"]
+
+# 2. Poll
+deadline = time.time() + 300
+while time.time() < deadline:
+    time.sleep(2.5)
+    r = requests.get(f"{BASE}/images/jobs/{job_id}", headers=HEADERS).json()
+    d = r["data"]
+    if d["status"] == "completed":
+        with open("upscaled.jpg", "wb") as f:
+            f.write(base64.b64decode(d["image"]["b64_json"]))
+        print(f"Cost: ${d['cost_usd']}, balance: ${d['balance_usd']}")
+        break
+    if d["status"] == "failed":
+        print("failed:", d.get("error"))
+        break
+```
+
+```bash cURL (synchronous)
+curl -X POST https://api.gpuniq.com/v1/llm/images/generations \
+  -H "X-API-Key: gpuniq_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "topaz-image-upscale",
+    "input_images": ["https://example.com/old_photo.jpg"],
+    "scale": 2,
+    "response_format": "b64_json"
+  }'
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField body="model" type="string" required>
+  `topaz-image-upscale`.
+</ParamField>
+
+<ParamField body="input_images" type="string[]" required>
+  Exactly one source image: a `data:` URL, `https://` URL, or bare
+  base64 string. Up to 25 MB / 4096×4096 px.
+</ParamField>
+
+<ParamField body="scale" type="integer" default="2">
+  Upscale factor: `2`, `4`, or `8`. The output long side is capped at
+  **8192 px** — a factor that would exceed the cap is clamped down and
+  the effective scale is echoed back in the response `config`.
+</ParamField>
+
+<ParamField body="mode" type="string" default="standard">
+  Enhancement profile:
+
+  - `standard` — balanced detail recovery, right for most sources.
+  - `high-fidelity` — conservative, preserves grain and texture; best
+    for already-clean photography.
+  - `low-res` — aggressive reconstruction for small or heavily
+    compressed sources (screenshots, thumbnails, old web images).
+</ParamField>
+
+<ParamField body="face_recovery" type="boolean" default="false">
+  Runs the dedicated face-restoration pass on detected faces. No extra
+  charge; adds a few seconds of processing.
+</ParamField>
+
+<ParamField body="output_format" type="string" default="png">
+  `png` (lossless), `jpeg`, or `webp` — same server-side re-encode
+  semantics as the [image generation API](/llm#image-generation).
+</ParamField>
+
+<ParamField body="response_format" type="string" default="b64_json">
+  `b64_json` returns inline base64; `url` returns a short-lived
+  download URL.
+</ParamField>
+
+Billing is a flat **$0.05 per delivered image**, regardless of scale,
+mode, or face recovery.
+
+## Video upscaling
+
+`topaz-video-upscale` runs on the same job surface as video
+generation: `POST /v1/llm/videos/jobs` → poll
+`GET /v1/llm/videos/jobs/{job_id}`. The source clip goes in
+`video_url`; no prompt is required.
+
+```python Python
+import time, requests
+
+BASE = "https://api.gpuniq.com/v1/llm"
+HEADERS = {"X-API-Key": "gpuniq_your_key"}
+
+# 1. Kickoff — the source is probed and the cost estimate is returned immediately
+start = requests.post(
+    f"{BASE}/videos/jobs",
+    headers=HEADERS,
+    json={
+        "model": "topaz-video-upscale",
+        "video_url": "https://example.com/clips/drone_720p.mp4",
+        "resolution": "4k",   # 1080p (default) | 4k
+        "fps": 60,            # optional frame interpolation, ×1.5 on price
+    },
+).json()
+job_id = start["data"]["job_id"]
+print(f"job: {job_id}, est cost: ${start['data']['estimated_cost_usd']}")
+
+# 2. Poll — upscaling runs at roughly 2-4× realtime depending on target
+deadline = time.time() + 900
+while time.time() < deadline:
+    time.sleep(3)
+    r = requests.get(f"{BASE}/videos/jobs/{job_id}", headers=HEADERS).json()
+    d = r["data"]
+    if d["status"] == "completed":
+        print(f"video: {d['video']['url']}")
+        print(f"cost: ${d['cost_usd']}, balance: ${d['balance_usd']}")
+        break
+    if d["status"] == "failed":
+        print("failed:", d.get("error"))
+        break
+```
+
+### Parameters
+
+<ParamField body="model" type="string" required>
+  `topaz-video-upscale`.
+</ParamField>
+
+<ParamField body="video_url" type="string" required>
+  `https` URL of the source clip. MP4, MOV, or WebM; up to **500 MB**
+  and **300 seconds**. Source resolution up to 2048×2048 for the 4K
+  target (anything already at or above the target is rejected up-front,
+  not billed).
+</ParamField>
+
+<ParamField body="resolution" type="string" default="1080p">
+  Target resolution: `1080p` or `4k`. Aspect ratio is always preserved
+  — `4k` means the long side is scaled to 3840 px.
+</ParamField>
+
+<ParamField body="fps" type="integer">
+  Optional frame interpolation target. Omit to keep the source frame
+  rate; `60` interpolates to 60 fps and multiplies the per-second rate
+  by **1.5**.
+</ParamField>
+
+### Response
+
+```jsonc
+// POST /v1/llm/videos/jobs — kickoff
+{
+  "job_id": "vid_7c1f04b2ad9e4f31a2c8",
+  "status": "pending",
+  "model": "topaz-video-upscale",
+  "estimated_cost_usd": 1.80,   // 10s source × $0.12 (4K) × 1.5 (60 fps)
+  "config": { "resolution": "4k", "fps": 60, "source_duration": 10, "task": "v2v" }
+}
+
+// GET /v1/llm/videos/jobs/{job_id} — completed
+{
+  "job_id": "vid_7c1f04b2ad9e4f31a2c8",
+  "status": "completed",
+  "model": "topaz-video-upscale",
+  "video": { "url": "https://cdn.example.com/.../upscaled_4k_60.mp4" },
+  "cost_usd": 1.80,
+  "balance_usd": 7.37825791,
+  "config": { "resolution": "4k", "fps": 60, "source_duration": 10, "task": "v2v" }
+}
+```
+
+The delivered `video.url` stays downloadable for at least **24 hours**
+— copy the file to your own storage promptly.
+
+### Pricing math
+
+Cost = source duration (rounded **up** to a whole second) × the
+per-second rate for the target:
+
+| Target | Rate / source second |
+|--------|----------------------|
+| 1080p | $0.06 |
+| 1080p + 60 fps | $0.09 |
+| 4K | $0.12 |
+| 4K + 60 fps | $0.18 |
+
+Examples: a 12.4 s clip to 1080p → 13 × $0.06 = **$0.78**; the same
+clip to 4K at 60 fps → 13 × $0.18 = **$2.34**. The kickoff response
+returns `estimated_cost_usd` computed from the probed source duration,
+so you can bail out (just stop polling — an unfinished job is never
+charged) before committing to an expensive run.
+
+## Errors
+
+Topaz requests return the same stable error envelope as the rest of
+the LLM & media API — see the [error reference](/llm/errors). The
+codes you are most likely to meet:
+
+| Code | Meaning |
+|------|---------|
+| `invalid_request_error` | Missing `input_images` / `video_url`, oversized source, unsupported container, or a source already at/above the target resolution. Rejected up-front, nothing billed. |
+| `insufficient_balance` | Balance below the job estimate at kickoff. Top up and retry. |
+| `rate_limit_per_key` | 120 req/min sliding window per key — back off and retry. |

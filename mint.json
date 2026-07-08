@@ -76,6 +76,7 @@
           "group": "LLM & Image API",
           "pages": [
             "llm",
+            "llm/topaz",
             "llm/long-generations",
             "llm/errors"
           ]

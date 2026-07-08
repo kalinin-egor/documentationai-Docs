@@ -7,6 +7,34 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-07-08" description="Topaz upscaling — Gigapixel-class image enhance + Video AI upscale to 4K / 60 fps" tags={["feature", "image", "video", "topaz"]}>
+
+## Topaz Labs image & video upscaling
+
+Two **Topaz Labs** enhancement SKUs join the media catalog — the same
+engines behind Gigapixel AI and Video AI:
+
+| Model | Slug | Price |
+|-------|------|-------|
+| Topaz Image Upscale | `topaz-image-upscale` | $0.05 / image |
+| Topaz Video Upscale | `topaz-video-upscale` | $0.06 / source second (1080p), $0.12 (4K), ×1.5 for 60 fps |
+
+No prompt needed — send a source, pick the target, get the enhanced
+result. Images run on the existing image surfaces (`input_images`
+carries the source; 2× / 4× / 8×, optional face recovery, up to 8K
+output). Video runs on `POST /v1/llm/videos/jobs` with `video_url`
+(sources up to 500 MB / 300 s, targets 1080p or 4K, optional 60 fps
+frame interpolation).
+
+Billing follows the standard job semantics: charged only when the
+completion poll returns a result, and the kickoff response includes
+`estimated_cost_usd` computed from the probed source duration so you
+can bail out before an expensive run. See the
+[Topaz upscaling guide](/llm/topaz) for parameters, limits, and
+end-to-end examples.
+
+</Update>
+
 <Update label="2026-05-22" description="gpt-image-2 on the job-based image API — no more long-held connections / CDN timeouts" tags={["feature", "image"]}>
 
 ## `gpt-image-2` now works on the job-based image API
