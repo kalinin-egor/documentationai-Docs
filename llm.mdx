@@ -123,10 +123,11 @@ while time.time() < deadline:
         break
 ```
 
-The job API accepts the Nano Banana slugs, `gpt-image-2`, and
-`topaz-image-upscale`. `n` must be `1` — issue separate jobs in
-parallel for batches. The other image slugs in the catalog above are
-served only on the synchronous endpoint.
+The job API accepts the Nano Banana slugs and `gpt-image-2`. `n` must be
+`1` — issue separate jobs in parallel for batches. The other image slugs
+in the catalog above are served only on the synchronous endpoint.
+(Topaz upscaling/enhancement has its own dedicated job surface — see the
+[Topaz guide](/llm/topaz).)
 
 #### Generating an image inside a chat session
 
@@ -320,21 +321,24 @@ The polling endpoint transparently falls back across internal routes if the firs
 
 ### Upscaling & Enhancement (Topaz)
 
-**Topaz Labs** enhancement models — the engines behind Gigapixel AI
-and Video AI — run on the same image- and video-job surfaces. No
-prompt needed: send a source, pick the target, get the enhanced
-result back.
+**Topaz Labs** restoration engines — the models behind Gigapixel AI
+and Video AI — run on a dedicated job surface. No prompt: send a
+source, pick a model, get the enhanced result back.
 
-| Model | Slug | Price | Notes |
-|-------|------|-------|-------|
-| Topaz Image Upscale | `topaz-image-upscale` | $0.05 / image | 2× / 4× / 8×, face recovery, up to 8K output |
-| Topaz Video Upscale | `topaz-video-upscale` | $0.06 / source second | 1080p target; $0.12/s for 4K, ×1.5 for 60 fps interpolation |
+Topaz is billed differently from the generative media above. It is a
+restoration API metered in **credits**, so instead of a flat per-image
+rate the cost scales with output size and is charged at **$0.14 per
+credit** (≈1 credit per 24 MP of output for precision models — a 4K
+upscale is about **$0.14**). You pay only when the job completes.
 
-Image sources go in `input_images` on the image endpoints; video
-sources go in `video_url` on `POST /v1/llm/videos/jobs`. Billing
-follows the standard job semantics — you pay only when the completion
-poll returns a result. See the [Topaz upscaling guide](/llm/topaz)
-for parameters, limits, and end-to-end examples.
+| Surface | Endpoint | Example models |
+|---------|----------|----------------|
+| Image | `POST /v1/llm/topaz/image/jobs` → poll `GET .../{job_id}` | `topaz-enhance-standard`, `topaz-denoise-strong`, `topaz-sharpen-super-focus` |
+| Video | `POST /v1/llm/topaz/video/jobs` → poll `GET .../{job_id}` | `topaz-video-proteus`, `topaz-video-starlight`, `topaz-video-apollo` |
+| Catalog | `GET /v1/llm/topaz/models` | live model list + `usd_per_credit` |
+
+See the [Topaz upscaling guide](/llm/topaz) for the full model catalog,
+parameters, credit-pricing table, and end-to-end examples.
 
 Chat models are sold at **20% below vendor list price**.
 
@@ -543,7 +547,7 @@ curl -X POST https://api.gpuniq.com/v1/openai/images/generations \
 #### Parameters
 
 <ParamField body="model" type="string" required>
-  Any image slug from the [catalog](#image-generation): the Nano Banana family, `grok-4-image`, `gpt-image-2`, `gpt-image-1-5`, `gpt-4o-image`, `flux-2-pro`, `flux-2-flex`, `flux-kontext-pro`, `flux-kontext-max`, `seedream-4`, `seedream-4-5`, `seedream-5-0-lite`, `z-image`, or `topaz-image-upscale` (upscaling — see the [Topaz guide](/llm/topaz)).
+  Any image slug from the [catalog](#image-generation): the Nano Banana family, `grok-4-image`, `gpt-image-2`, `gpt-image-1-5`, `gpt-4o-image`, `flux-2-pro`, `flux-2-flex`, `flux-kontext-pro`, `flux-kontext-max`, `seedream-4`, `seedream-4-5`, `seedream-5-0-lite`, or `z-image`. (Topaz upscaling models live on their own surface — see the [Topaz guide](/llm/topaz).)
 </ParamField>
 
 <ParamField body="prompt" type="string" required>
@@ -577,7 +581,7 @@ curl -X POST https://api.gpuniq.com/v1/openai/images/generations \
 </ParamField>
 
 <ParamField body="input_images" type="string[]">
-  Optional reference photos for image-to-image / editing. Each entry is a `data:` URL, `https://` URL, or bare base64 string. Supported by Nano Banana family, GPT Image, FLUX Kontext, Seedream and Nano Banana Pro edit slugs. **Required** (exactly one entry) for `topaz-image-upscale`.
+  Optional reference photos for image-to-image / editing. Each entry is a `data:` URL, `https://` URL, or bare base64 string. Supported by Nano Banana family, GPT Image, FLUX Kontext, Seedream and Nano Banana Pro edit slugs.
 </ParamField>
 
 <Callout kind="info">

@@ -7,31 +7,33 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
-<Update label="2026-07-08" description="Topaz upscaling — Gigapixel-class image enhance + Video AI upscale to 4K / 60 fps" tags={["feature", "image", "video", "topaz"]}>
+<Update label="2026-07-08" description="Topaz upscaling — Gigapixel image enhance + Video AI upscale, credit-metered on a dedicated job surface" tags={["feature", "image", "video", "topaz"]}>
 
 ## Topaz Labs image & video upscaling
 
-Two **Topaz Labs** enhancement SKUs join the media catalog — the same
-engines behind Gigapixel AI and Video AI:
+The full **Topaz Labs** restoration catalog joins GPUniq — the engines
+behind Gigapixel AI and Video AI. ~20 image models (Gigapixel precision,
+Wonder/Redefine generative, Sharpen, Denoise, Restore, Lighting) and
+~35 video models (Proteus, Starlight, Denoise, frame interpolation,
+utilities). No prompt — send a source, pick a model, get the enhanced
+result.
 
-| Model | Slug | Price |
-|-------|------|-------|
-| Topaz Image Upscale | `topaz-image-upscale` | $0.05 / image |
-| Topaz Video Upscale | `topaz-video-upscale` | $0.06 / source second (1080p), $0.12 (4K), ×1.5 for 60 fps |
+Topaz is a restoration API metered in **credits**, so unlike the flat
+per-image / per-second generative SKUs it is billed on the exact credits
+each job consumes, at **$0.14 per credit** (≈1 credit per 24 MP of output
+for precision models — a 4K upscale is about $0.14). You pay only when
+the job completes; the kickoff returns an `estimated_cost_usd`.
 
-No prompt needed — send a source, pick the target, get the enhanced
-result. Images run on the existing image surfaces (`input_images`
-carries the source; 2× / 4× / 8×, optional face recovery, up to 8K
-output). Video runs on `POST /v1/llm/videos/jobs` with `video_url`
-(sources up to 500 MB / 300 s, targets 1080p or 4K, optional 60 fps
-frame interpolation).
+Dedicated job surface:
 
-Billing follows the standard job semantics: charged only when the
-completion poll returns a result, and the kickoff response includes
-`estimated_cost_usd` computed from the probed source duration so you
-can bail out before an expensive run. See the
-[Topaz upscaling guide](/llm/topaz) for parameters, limits, and
-end-to-end examples.
+| Surface | Endpoint |
+|---------|----------|
+| Image | `POST /v1/llm/topaz/image/jobs` → poll `GET .../{job_id}` |
+| Video | `POST /v1/llm/topaz/video/jobs` → poll `GET .../{job_id}` |
+| Catalog | `GET /v1/llm/topaz/models` (live list + `usd_per_credit`) |
+
+See the [Topaz upscaling guide](/llm/topaz) for the model catalog,
+parameters, and end-to-end examples.
 
 </Update>
 
