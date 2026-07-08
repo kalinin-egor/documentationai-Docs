@@ -80,6 +80,21 @@
                     "icon": "message-circle"
                   },
                   {
+                    "title": "Topaz Upscaling",
+                    "path": "llm/topaz",
+                    "icon": "image"
+                  },
+                  {
+                    "title": "Long Generations",
+                    "path": "llm/long-generations",
+                    "icon": "align-left"
+                  },
+                  {
+                    "title": "Error Reference",
+                    "path": "llm/errors",
+                    "icon": "alert-triangle"
+                  },
+                  {
                     "title": "Payments",
                     "path": "payments",
                     "icon": "credit-card"
