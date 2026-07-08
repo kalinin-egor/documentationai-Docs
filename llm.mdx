@@ -598,9 +598,9 @@ claude
 
 Use any Claude slug from `/v1/openai/models` for the two model variables. Streaming and tool use work out of the box. All tokens are billed against your GPUniq balance — no separate Anthropic account required.
 
-<Note>
+<Callout kind="info">
 Set `ANTHROPIC_SMALL_FAST_MODEL` too: Claude Code calls a smaller "background" model for things like commit messages and titles. If it points at a slug GPUniq doesn't serve, those background calls fail even when the main model works.
-</Note>
+</Callout>
 
 ### Cursor
 
