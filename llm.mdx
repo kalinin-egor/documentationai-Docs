@@ -58,8 +58,8 @@ Image models are billed per returned image, not per token.
 | Model | Slug | Price / image | Notes |
 |-------|------|---------------|-------|
 | Nano Banana | `nano-banana` | $0.0312 | Fast text-to-image & image-to-image, 1K |
-| Nano Banana 2 | `nano-banana-2` | $0.0500 | Quality-value generation up to 2K |
-| Nano Banana Pro | `nano-banana-pro` | $0.1072 | Higher quality, ~1K resolution |
+| Nano Banana 2 | `nano-banana-2` | $0.0500 | Quality-value generation, 1K–4K (set via `size`) |
+| Nano Banana Pro | `nano-banana-pro` | $0.1072 | Higher quality, 1K–2K (set via `size`) |
 | Nano Banana Pro 4K | `nano-banana-pro-4k` | $0.192 | 4K resolution |
 | Grok 4 Image | `grok-4-image` | $0.0352 | xAI image generator |
 | GPT Image 2 | `gpt-image-2` | $0.0464 | OpenAI image, default 1K |
@@ -693,7 +693,13 @@ curl -X POST https://api.gpuniq.com/v1/openai/images/generations \
 </ParamField>
 
 <ParamField body="size" type="string">
-  Output resolution hint forwarded to the upstream, e.g. `1024x1024`, `2048x2048`, `4096x4096`. Nano Banana Pro 4K defaults to 4096.
+  Output resolution and shape hint forwarded to the upstream. Accepts
+  `WIDTHxHEIGHT` (e.g. `1024x1024`, `2048x2048`, `4096x4096`), a bare tier
+  (`1k` / `2k` / `4k`), or an aspect-ratio string (`1:1`, `16:9`, `21:9`, …)
+  when you care about shape rather than exact pixels. `nano-banana-2`
+  renders 1K–4K (default 2K); `nano-banana-pro` renders 1K–2K (use
+  `nano-banana-pro-4k` for 4K, default 4096); wide ratios like `21:9` are
+  supported across the Nano Banana line.
 </ParamField>
 
 <ParamField body="quality" type="string">
