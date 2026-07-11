@@ -210,7 +210,7 @@ returns a `video.url` — a failed or timed-out job costs nothing.
 | Hailuo 2.3 | `hailuo-2-3` | $0.350 | 768p 6s |
 | Seedance 1.0 Pro | `seedance-1-0-pro` | $0.210 | ByteDance 720p, 5s, t2v + i2v (per video) |
 | Seedance 1.5 Pro | `seedance-1-5-pro` | $0.160 | ByteDance 720p, 5s, t2v + i2v (per video) |
-| Seedance 2 | `seedance-2` | $0.33 / s | ByteDance 720p, **billed per second** (5s ≈ $1.65) |
+| Seedance 2 | `seedance-2` | $0.165–$1.65 / s | ByteDance 480p–4k, **billed per second, rate depends on resolution** (720p: $0.33/s, 5s ≈ $1.65) |
 | Alibaba Wan 2.2 Fast | `wan-2-2-fast` | $0.120 | 720p fast tier |
 | Alibaba Wan 2.5 | `wan-2-5` | $0.600 | 720p 5s |
 | Alibaba Wan 2.6 | `wan-2-6` | $0.800 | 720p 5s flagship |
@@ -242,16 +242,29 @@ budgeting a batch.
 |------|-------|------------|------------------|-------|---------|
 | `seedance-1-0-pro` | Seedance 1.0 Pro | 720p | 5s | t2v, i2v | **Flat $0.210 / video** |
 | `seedance-1-5-pro` | Seedance 1.5 Pro | 720p | 5s | t2v, i2v | **Flat $0.160 / video** |
-| `seedance-2` | Seedance 2 | 720p | 5s | t2v, i2v | **Per second — $0.33 / s** |
+| `seedance-2` | Seedance 2 | 480p / 720p / 1080p / 4k | 5s (4–15s) | t2v, i2v, first/last-frame, ref-to-video (image + video + audio refs) | **Per second, by resolution — see below** |
 
 <Callout kind="warning">
   **`seedance-2` is billed per second of generated video, not per
-  clip.** A 5-second generation (the default) costs 5 × $0.33 =
-  **$1.65**; a 10-second generation costs **$3.30**. The two `-pro`
-  SKUs, by contrast, are a flat per-video price regardless of duration.
-  Always read the `cost_usd` field of the completion response for the
-  exact amount charged — and the `estimated_cost_usd` on the kickoff
-  response, which already accounts for the duration you requested.
+  clip — and the rate depends on the resolution you pick.**
+
+  | Resolution | $/second | $/second with reference video(s) |
+  |------------|----------|----------------------------------|
+  | `480p` | $0.165 | $0.096 |
+  | `720p` (default) | $0.33 | $0.21 |
+  | `1080p` | $0.745 | $0.52 |
+  | `4k` | $1.65 | $1.06 |
+
+  A 5-second 720p generation (the default) costs 5 × $0.33 =
+  **$1.65**; a 10-second one costs **$3.30**. Reference-to-video jobs
+  use the lower per-second rate but are billed for the output duration
+  **plus up to 15 seconds of reference-clip time** (the upstream meters
+  reference footage too), so a 5s 720p ref-to-video job is estimated at
+  (5 + 15) × $0.21 = **$4.20**. The two `-pro` SKUs, by contrast, are a
+  flat per-video price regardless of duration. Always read the
+  `cost_usd` field of the completion response for the exact amount
+  charged — and the `estimated_cost_usd` on the kickoff response, which
+  already accounts for the duration and resolution you requested.
 </Callout>
 
 **Choosing between them:**
@@ -301,11 +314,50 @@ while time.time() < deadline:
         break
 ```
 
-Seedance shares the standard [video job API](#video-generation) —
-`duration` and `image_url` are the two fields that matter for it;
-`aspect_ratio` is honoured where the upstream supports it. Fields
-specific to other families (`audio`, `mode`, `resolution` tiers,
-`video_url` motion-control) are ignored by Seedance.
+Seedance shares the standard [video job API](#video-generation). The two
+`-pro` SKUs (`seedance-1-0-pro`, `seedance-1-5-pro`) do text-to-video and
+image-to-video only: `duration` and `image_url` are the fields that
+matter, `aspect_ratio` is honoured where the upstream supports it, and
+fields specific to other families (`audio`, `mode`, `resolution` tiers,
+`video_url`) are ignored.
+
+`seedance-2` accepts more of the request body. On top of t2v and i2v it
+supports:
+
+- **First + last frame** — pass `image_url` (start) together with
+  `last_frame_url` (end); the clip interpolates between the two frames.
+- **Reference-to-video** — condition the render on up to **3 reference
+  clips** (`video_url` / `video_urls`), up to **9 reference images**
+  (`reference_image_urls`) and up to **3 reference audio tracks**
+  (`audio_url` / `audio_urls`), in any combination. Audio references
+  need at least one image or video reference alongside them (the API
+  returns a 400 otherwise). A single `image_url` sent together with any
+  reference input is treated as a subject reference rather than a start
+  frame. First/last-frame and reference-to-video are mutually exclusive
+  — when any reference input is attached, `last_frame_url` is dropped.
+- **Resolution choice** — `480p`, `720p` (default), `1080p` or `4k` via
+  `resolution`; the per-second price scales with it (see the pricing
+  table above).
+- **Generated audio track** — set `audio: true` to have the model
+  generate sound for the clip.
+
+`duration` applies to all three SKUs (`seedance-2` accepts 4–15
+seconds); `seedance-2` is billed per second regardless of which mode you
+use. On `seedance-2`, `aspect_ratio` additionally accepts `auto`,
+`21:9`, `4:3` and `3:4` — omit it in i2v mode to follow the input
+frame's geometry.
+
+Reference-file limits (enforced upstream): videos MP4/MOV, 2–15s
+combined, ≤50MB total, 480p–720p each; images JPG/PNG/WebP; audio
+MP3/WAV, ≤15s combined.
+
+<Callout kind="info">
+  **There is no `elements` parameter.** Seedance 2's multi-element /
+  multimodal reference capability is expressed through the fields above —
+  `image_url` / `last_frame_url` for frames, `video_url` / `video_urls`
+  for reference clips, `reference_image_urls` for subject/style images
+  and `audio_url` / `audio_urls` for reference audio.
+</Callout>
 
 #### Job-based video generation
 
@@ -358,11 +410,16 @@ while time.time() < deadline:
 | `model` | string | yes | Slug from the table above. |
 | `prompt` | string | yes | Up to 4000 characters. |
 | `duration` | int | no | Seconds; valid range depends on model (5 / 10 for most Kling, 1-15 for Avatar). |
-| `aspect_ratio` | string | no | `16:9` (default), `9:16`, `1:1` where supported. |
-| `image_url` | string | no | https URL or data URI — enables image-to-video. |
-| `video_url` | string | no | https URL — required for motion-control v2v variants. |
-| `resolution` | string | no | `720p` (default for some SKUs), `1080p` (default for Kling), `4k` (Kling 3.0 only). |
-| `audio` | bool | no | Default `false`. Kling 2.6 / 3.0 double the price when `true`. |
+| `aspect_ratio` | string | no | `16:9` (default), `9:16`, `1:1` where supported. Seedance 2 additionally accepts `auto`, `21:9`, `4:3`, `3:4`. |
+| `image_url` | string | no | https URL or data URI — enables image-to-video (start frame). |
+| `last_frame_url` | string | no | https URL or data URI — end frame for first/last-frame interpolation. Supported on Kling 2.1-Pro / 2.6 / 3.0 / O3, Veo 3.1 and Seedance 2. Requires `image_url`. |
+| `video_url` | string | no | https URL — reference clip for motion-control v2v variants and Seedance 2 reference-to-video. |
+| `video_urls` | array | no | Up to 3 https URLs — multiple reference clips for reference-to-video (Seedance 2). Single-reference models use the first entry. |
+| `reference_image_urls` | array | no | Seedance 2 only — up to 9 https URLs / data URIs of subject or style reference images (JPG/PNG/WebP). Switches the job to reference-to-video mode. |
+| `audio_url` | string | no | Seedance 2 only — reference audio track (MP3/WAV). Requires at least one image or video reference in the same request. |
+| `audio_urls` | array | no | Seedance 2 only — up to 3 reference audio tracks, ≤15s combined; merged with `audio_url`. |
+| `resolution` | string | no | Seedance 2: `480p` / `720p` (default) / `1080p` / `4k`, priced per second per resolution. Kling: `1080p` (default), `4k` (Kling 3.0 / O3 only). |
+| `audio` | bool | no | Default `false`. Kling 2.6 / 3.0 double the price when `true`; on Seedance 2 generates the clip's audio track. |
 | `mode` | string | no | `standard` / `pro` (default) / `master` for Kling 2.1; `turbo` for 2.5 Turbo Pro. |
 
 ##### Response
