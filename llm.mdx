@@ -370,9 +370,11 @@ use. On `seedance-2`, `aspect_ratio` additionally accepts `auto`,
 `21:9`, `4:3` and `3:4` — omit it in i2v mode to follow the input
 frame's geometry.
 
-Reference-file limits (enforced upstream): videos MP4/MOV, 2–15s
-combined, ≤50MB total, 480p–720p each; images JPG/PNG/WebP; audio
-MP3/WAV, ≤15s combined.
+Reference-file limits: videos 2–15s combined, ≤50MB total; images
+JPG/PNG/WebP; audio MP3/WAV, ≤15s combined. **Video resolution and
+container are unrestricted** — 1080p/4K clips and non-MP4 formats
+(webm, MKV, …) are automatically converted to ≤720p MP4 on our side
+before dispatch, so send your source footage as-is.
 
 <Callout kind="info">
   **There is no `elements` parameter.** Seedance 2's multi-element /
