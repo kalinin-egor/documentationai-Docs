@@ -194,9 +194,9 @@ returns a `video.url` — a failed or timed-out job costs nothing.
 | OpenAI Sora 2 Pro | `sora-2-pro-video` | $1.000 | Premium quality, 10s |
 | Sora 2 Official | `sora-2-official` | $0.480 | 8s, official API |
 | Sora 2 Pro Official | `sora-2-pro-official` | $0.560 | 8s 1080p, official API |
-| Google Veo 3.1 Lite | `veo-3-1-lite` | $0.100 | 720p / 1080p |
-| Google Veo 3.1 Fast | `veo-3-1-fast` | $0.200 | Balanced 720p / 1080p |
-| Google Veo 3.1 Quality | `veo-3-1-quality` | $1.200 | Flagship Google video |
+| Google Veo 3.1 Lite | `veo-3-1-lite` | from $0.30 | 720p / 1080p / 4K, 4–8s; i2v, first/last frame, reference-to-video |
+| Google Veo 3.1 Fast | `veo-3-1-fast` | from $0.60 | 720p / 1080p / 4K, 4–8s; i2v, first/last frame, reference-to-video |
+| Google Veo 3.1 Quality | `veo-3-1-quality` | from $2.50 | Flagship; 720p / 1080p / 4K, 4–8s; i2v, first/last frame |
 | Kling 2.1 Pro | `kling-2-1` | $0.405 | Standard / Pro / Master tiers, 5s or 10s, i2v |
 | Kling 2.5 Turbo Pro | `kling-2-5-turbo-pro` | $0.315 | 5s or 10s, t2v / i2v |
 | Kling 2.6 | `kling-2-6` | $0.315 | Optional audio, 5s or 10s, t2v / i2v |
@@ -229,6 +229,29 @@ returns a `video.url` — a failed or timed-out job costs nothing.
   guarantees we never bill below source cost, so on a provider
   fallback the price may rise by 1-3%.
 </Callout>
+
+#### Veo 3.1 (Google)
+
+All three Veo tiers are billed **per video, by resolution**. Duration
+can be 4, 6 or 8 seconds (default 8) and does not change the price.
+
+| Resolution | Lite | Fast | Quality |
+|------------|------|------|---------|
+| `720p` (default) | $0.30 | $0.60 | $2.50 |
+| `1080p` | $0.35 | $0.65 | $2.55 |
+| `4k` | $1.50 | $1.80 | $3.70 |
+
+- **First + last frame** — `image_url` (first frame) + `last_frame_url`
+  (last frame) on **all three tiers**; the clip interpolates between
+  the two frames and the order is honoured.
+- **Reference-to-video** — up to **3 reference images** via
+  `reference_image_urls` on `veo-3-1-fast` / `veo-3-1-lite` (8-second
+  clips only; not available on Quality). Mutually exclusive with
+  `last_frame_url`.
+- `aspect_ratio`: `16:9` (default), `9:16`, or `auto` (follows the
+  input image geometry).
+- On a provider fallback the charge follows the serving upstream's
+  rate — the exact amount is always in the completion `cost_usd`.
 
 #### Seedance (ByteDance)
 
@@ -412,7 +435,7 @@ while time.time() < deadline:
 | `duration` | int | no | Seconds; valid range depends on model (5 / 10 for most Kling, 1-15 for Avatar). |
 | `aspect_ratio` | string | no | `16:9` (default), `9:16`, `1:1` where supported. Seedance 2 additionally accepts `auto`, `21:9`, `4:3`, `3:4`. |
 | `image_url` | string | no | https URL or data URI — enables image-to-video (start frame). |
-| `last_frame_url` | string | no | https URL or data URI — end frame for first/last-frame interpolation. Supported on Kling 2.1-Pro / 2.6 / 3.0 / O3, Veo 3.1 and Seedance 2. Requires `image_url`. |
+| `last_frame_url` | string | no | https URL or data URI — end frame for first/last-frame interpolation. Supported on Kling 2.1-Pro / 2.6 / 3.0 / O3, Veo 3.1 (all tiers) and Seedance 2. Requires `image_url`. The first image is always the FIRST frame, the second the LAST — order matters. |
 | `video_url` | string | no | https URL — reference clip for motion-control v2v variants and Seedance 2 reference-to-video. |
 | `video_urls` | array | no | Up to 3 https URLs — multiple reference clips for reference-to-video (Seedance 2). Single-reference models use the first entry. |
 | `reference_image_urls` | array | no | Seedance 2 only — up to 9 https URLs / data URIs of subject or style reference images (JPG/PNG/WebP). Switches the job to reference-to-video mode. |
