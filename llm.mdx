@@ -94,11 +94,14 @@ renders 2752×1536), so a QHD `2560x1440` ask stays on the base Pro
 (more than ~4.2 MP, or wider than 3168px) auto-upgrade to
 `nano-banana-pro-4k` ($0.192).
 
-If the 2K/4K upstream rejects a GPT Image 2 request's *content*
-(prompt/reference images), GPUniq retries it once as the base
-`gpt-image-2` at the base price ($0.0464) — you get a ~1.6K render and
-the response's `model` field shows the base slug, so the billing always
-matches what was delivered.
+GPT Image 2 2K/4K renders now return the **exact width×height you
+asked for** (up to a 3840px long side; larger asks scale down
+proportionally, e.g. 4096×4096 → 3840×3840) and typically complete in
+**40–80 seconds**. If the primary route rejects a request, GPUniq
+retries on an alternate 2K/4K route automatically; if the *content*
+itself is rejected everywhere, the request degrades once to the base
+`gpt-image-2` at the base price ($0.0464, ~1.6K render) — the response's
+`model` field always names the SKU you were billed for.
 
 **Nano Banana 4K output dimensions depend on the aspect ratio** — the
 tier fixes the pixel *budget*, not the long side, so wide formats come
