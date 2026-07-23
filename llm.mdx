@@ -59,8 +59,8 @@ Image models are billed per returned image, not per token.
 |-------|------|---------------|-------|
 | Nano Banana | `nano-banana` | $0.0312 | Fast text-to-image & image-to-image, 1K |
 | Nano Banana 2 | `nano-banana-2` | $0.0500 | Quality-value generation, 1K–4K (set via `size`) |
-| Nano Banana Pro | `nano-banana-pro` | $0.1072 | Higher quality, 1K–2K (set via `size`) |
-| Nano Banana Pro 4K | `nano-banana-pro-4k` | $0.192 | 4K resolution |
+| Nano Banana Pro | `nano-banana-pro` | $0.1072 | Higher quality, 1K–2K (set via `size`; >2048px auto-upgrades to Pro 4K) |
+| Nano Banana Pro 4K | `nano-banana-pro-4k` | $0.192 | 4K resolution — also reached by `size` above 2048px |
 | Grok 4 Image | `grok-4-image` | $0.0352 | xAI image generator |
 | GPT Image 2 | `gpt-image-2` | $0.0464 | OpenAI image, 1K tier (higher `size` auto-upgrades, see below) |
 | GPT Image 2 · 2K | `gpt-image-2-2k` | $0.07 | 2K tier — also reached by `size` up to 2048px |
@@ -85,7 +85,10 @@ tier ($0.11). The response's `usage.model` (sync) / `model` (job) names
 the tier you were billed for, and the kickoff's `estimated_cost_usd`
 reflects it up front. Aspect ratio follows your `size` proportions —
 wide and tall formats including `21:9` and `3:2` are honoured, with or
-without reference images.
+without reference images. The same ceiling rule applies to
+**Nano Banana Pro**: a `size` above 2048px auto-upgrades the request to
+`nano-banana-pro-4k` ($0.192) so a 4K ask renders real 4K instead of
+silently clamping to 2K.
 
 <Callout kind="info">
   The synchronous `POST /v1/llm/images/generations` (and its OpenAI-compat

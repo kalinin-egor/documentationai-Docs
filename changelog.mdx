@@ -27,6 +27,10 @@ Two fixes to how `gpt-image-2` interprets your `size`:
   endpoints and `POST /v1/llm/images/jobs` are covered, with or without
   reference images.
 
+**Nano Banana Pro follows the same rule**: a `size` above 2048px now
+auto-upgrades the request to `nano-banana-pro-4k` ($0.192) — previously
+a 4K ask on `nano-banana-pro` silently rendered 2K at the Pro price.
+
 ## Typed failure causes on image jobs
 
 Failed image jobs (`GET /v1/llm/images/jobs/{job_id}`) now carry a
