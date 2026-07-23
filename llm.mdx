@@ -85,10 +85,20 @@ tier ($0.11). The response's `usage.model` (sync) / `model` (job) names
 the tier you were billed for, and the kickoff's `estimated_cost_usd`
 reflects it up front. Aspect ratio follows your `size` proportions —
 wide and tall formats including `21:9` and `3:2` are honoured, with or
-without reference images. The same ceiling rule applies to
-**Nano Banana Pro**: a `size` above 2048px auto-upgrades the request to
-`nano-banana-pro-4k` ($0.192) so a 4K ask renders real 4K instead of
-silently clamping to 2K.
+without reference images.
+
+**Nano Banana Pro** upgrades by *pixel budget*, not by long side —
+banana tiers scale output with the aspect ratio (the 2K tier at 16:9
+renders 2752×1536), so a QHD `2560x1440` ask stays on the base Pro
+($0.1072) and comes back at 2752×1536. Only asks beyond the 2K budget
+(more than ~4.2 MP, or wider than 3168px) auto-upgrade to
+`nano-banana-pro-4k` ($0.192).
+
+If the 2K/4K upstream rejects a GPT Image 2 request's *content*
+(prompt/reference images), GPUniq retries it once as the base
+`gpt-image-2` at the base price ($0.0464) — you get a ~1.6K render and
+the response's `model` field shows the base slug, so the billing always
+matches what was delivered.
 
 **Nano Banana 4K output dimensions depend on the aspect ratio** — the
 tier fixes the pixel *budget*, not the long side, so wide formats come
