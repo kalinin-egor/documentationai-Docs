@@ -225,6 +225,45 @@ A `data.status: "failed"` payload is **not** an HTTP error — the request itsel
 }
 ```
 
+### Image jobs: typed failure causes
+
+Failed **image** jobs (`GET /v1/llm/images/jobs/{job_id}`) additionally carry a machine-readable
+`error_code` inside the failed payload, so you can branch without parsing the message. Two values:
+
+| `error_code` | Meaning | What to do |
+|---|---|---|
+| `content_moderation` | The prompt and/or reference images were rejected by the upstream content policy. This is a **verdict on the input, not an outage** — GPUniq deliberately does not re-route these to another upstream. | **Do not retry the same prompt verbatim** — it will be rejected again. Rephrase and re-kick off. In practice, video-style phrasing on *image* models triggers this most often: shot durations ("a 12-second shot"), camera-movement language ("FPV drone flythrough", "single continuous shot, no cuts"), storyboard/scene directions. Describe the still image you want instead. |
+| `generation_failed` | A transient upstream failure. Where an alternate route exists, GPUniq already retried the job internally on a second provider before giving up — a `failed` with this code means the retry budget is exhausted for this job. | Re-kick off the job (a fresh `job_id`); exponential backoff with a 30-second ceiling is enough. |
+
+```jsonc
+// GET /v1/llm/images/jobs/{job_id} — moderation rejection (HTTP 200)
+{
+  "exception": 0,
+  "data": {
+    "status": "failed",
+    "job_id": "img_…",
+    "error": "Image request was rejected by the upstream content moderation.",
+    "error_code": "content_moderation"
+  },
+  "message": "Статус задачи"
+}
+```
+
+Two timing facts worth wiring into your client:
+
+- **Moderation verdicts are not instant.** The upstream evaluates content *during* generation, so a
+  `content_moderation` failure can surface several minutes after kickoff (typically 3–6 min on the
+  nano-banana family) — a job that has been `processing` for a while can still end in a policy
+  rejection rather than an image.
+- **Keep your polling budget at 10 minutes.** Worst-case successful delivery (a slow render followed
+  by an internal retry on an alternate route) approaches 7 minutes on the nano-banana family. A
+  7-minute client-side ceiling will abandon jobs that GPUniq would still have delivered; nothing is
+  charged until an image is actually delivered to a poll, so an abandoned job costs nothing but the
+  wait.
+
+Failed jobs are billed **nothing**, regardless of the cause. Video and music job failures currently
+carry only the human-readable `error` string; typed causes will arrive there in the same shape.
+
 ### Video-generation specific recipes
 
 Video kickoff errors fold into the tables above, but a few combinations come up often enough that they deserve a named recipe.

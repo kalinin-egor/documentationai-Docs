@@ -7,6 +7,45 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-07-23" description="GPT Image 2: true 2K/4K + honoured aspect ratios; typed image-job failures (content_moderation / generation_failed)" tags={["feature", "image", "fix"]}>
+
+## GPT Image 2 — real 2K/4K output and exact aspect ratios
+
+Two fixes to how `gpt-image-2` interprets your `size`:
+
+- **Resolution now follows a ceiling rule.** A `size` whose long side
+  exceeds 2048px routes to the 4K tier, above 1024px to the 2K tier —
+  the delivered image is never smaller than the ask. Requests like
+  `2880x2880` or `3840x2160` now render at the 4K tier (previously they
+  could round *down* to 2K). Tier upgrades are billed at the tier's own
+  per-image price (`gpt-image-2-2k` / `gpt-image-2-4k` in the catalog);
+  the response's `usage.model` / job `model` field always names the tier
+  you were billed for.
+- **Wide and tall aspects are honoured** — including `21:9` and `3:2`.
+  A `size` of `3840x1648` now returns a true 21:9 render (e.g.
+  3696×1584) instead of an upstream-chosen default. Both the sync
+  endpoints and `POST /v1/llm/images/jobs` are covered, with or without
+  reference images.
+
+## Typed failure causes on image jobs
+
+Failed image jobs (`GET /v1/llm/images/jobs/{job_id}`) now carry a
+machine-readable `error_code` next to the human-readable `error`:
+
+- `content_moderation` — the prompt/reference images were rejected by
+  the upstream content policy. Retrying verbatim will fail again;
+  rephrase the prompt (video-style phrasing on image models is the most
+  common trigger).
+- `generation_failed` — transient upstream failure; where an alternate
+  route exists GPUniq already retried internally before reporting it.
+  Re-kick off the job.
+
+Failed jobs are never charged. See
+[Errors → Image jobs](/llm/errors#image-jobs-typed-failure-causes)
+for handling recipes and polling-budget guidance.
+
+</Update>
+
 <Update label="2026-07-08" description="Topaz upscaling — Gigapixel image enhance + Video AI upscale, credit-metered on a dedicated job surface" tags={["feature", "image", "video", "topaz"]}>
 
 ## Topaz Labs image & video upscaling

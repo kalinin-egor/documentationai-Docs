@@ -62,7 +62,9 @@ Image models are billed per returned image, not per token.
 | Nano Banana Pro | `nano-banana-pro` | $0.1072 | Higher quality, 1K–2K (set via `size`) |
 | Nano Banana Pro 4K | `nano-banana-pro-4k` | $0.192 | 4K resolution |
 | Grok 4 Image | `grok-4-image` | $0.0352 | xAI image generator |
-| GPT Image 2 | `gpt-image-2` | $0.0464 | OpenAI image, default 1K |
+| GPT Image 2 | `gpt-image-2` | $0.0464 | OpenAI image, 1K tier (higher `size` auto-upgrades, see below) |
+| GPT Image 2 · 2K | `gpt-image-2-2k` | $0.07 | 2K tier — also reached by `size` up to 2048px |
+| GPT Image 2 · 4K | `gpt-image-2-4k` | $0.11 | 4K tier — also reached by `size` above 2048px |
 | GPT Image 1.5 | `gpt-image-1-5` | $0.020 | OpenAI image (cheaper tier) |
 | GPT-4o Image | `gpt-4o-image` | $0.040 | OpenAI 4o image |
 | FLUX.2 Pro | `flux-2-pro` | $0.060 | Black Forest Labs FLUX.2 Pro 1K |
@@ -73,6 +75,17 @@ Image models are billed per returned image, not per token.
 | Seedream 4.5 | `seedream-4-5` | $0.040 | ByteDance Seedream 4.5 |
 | Seedream 5.0 Lite | `seedream-5-0-lite` | $0.035 | ByteDance Seedream 5.0 Lite |
 | Z-Image | `z-image` | $0.020 | Alibaba Z-Image |
+
+**How `size` picks the GPT Image 2 tier (and the price).** The `size`
+field accepts `WIDTHxHEIGHT` or a bare `1k` / `2k` / `4k`. The tier is
+chosen by a *ceiling* rule on the long side — the delivered image is
+never smaller than the ask: up to 1024px → base `gpt-image-2`
+($0.0464), up to 2048px → the 2K tier ($0.07), above 2048px → the 4K
+tier ($0.11). The response's `usage.model` (sync) / `model` (job) names
+the tier you were billed for, and the kickoff's `estimated_cost_usd`
+reflects it up front. Aspect ratio follows your `size` proportions —
+wide and tall formats including `21:9` and `3:2` are honoured, with or
+without reference images.
 
 <Callout kind="info">
   The synchronous `POST /v1/llm/images/generations` (and its OpenAI-compat
@@ -94,6 +107,15 @@ returns — a timed-out or failed job costs nothing. Server-side, polls
 that arrive within 2 seconds of each other are coalesced via Redis, so
 hammering the endpoint will not be billed as repeated upstream calls.
 
+A `status: "failed"` payload carries a typed `error_code` —
+`content_moderation` (the input was rejected by the upstream content
+policy; rephrase, don't retry verbatim) or `generation_failed`
+(transient; re-kick off). Give the poll loop a **10-minute budget**:
+moderation verdicts and internal retries can land several minutes after
+kickoff, and abandoning early costs you the render you would have
+received. Handling recipes:
+[Errors → Image jobs](/llm/errors#image-jobs-typed-failure-causes).
+
 ```python Python
 import time, requests
 
@@ -108,8 +130,9 @@ start = requests.post(
 ).json()
 job_id = start["data"]["job_id"]
 
-# 2. Poll — 5-minute budget covers the slowest Pro / 4K runs
-deadline = time.time() + 300
+# 2. Poll — 10-minute budget: slow 4K renders, moderation verdicts and
+#    internal retries can all land several minutes after kickoff
+deadline = time.time() + 600
 while time.time() < deadline:
     time.sleep(2.5)
     r = requests.get(f"{BASE}/images/jobs/{job_id}", headers=HEADERS).json()
@@ -119,7 +142,14 @@ while time.time() < deadline:
         print(f"Cost: ${d['cost_usd']}, balance: ${d['balance_usd']}")
         break
     if d["status"] == "failed":
-        print("failed:", d.get("error"))
+        if d.get("error_code") == "content_moderation":
+            # Content-policy verdict — retrying the same prompt will fail
+            # again. Rephrase (drop video-style wording: durations,
+            # camera moves) and kick off a new job.
+            print("rejected by content policy:", d.get("error"))
+        else:
+            # generation_failed — transient; safe to re-kick off.
+            print("failed:", d.get("error"))
         break
 ```
 
