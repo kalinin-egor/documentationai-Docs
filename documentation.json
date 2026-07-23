@@ -95,11 +95,6 @@
                     "icon": "alert-triangle"
                   },
                   {
-                    "title": "Payments",
-                    "path": "payments",
-                    "icon": "credit-card"
-                  },
-                  {
                     "title": "Settings",
                     "path": "settings",
                     "icon": "sliders"
