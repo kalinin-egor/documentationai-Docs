@@ -90,6 +90,23 @@ without reference images. The same ceiling rule applies to
 `nano-banana-pro-4k` ($0.192) so a 4K ask renders real 4K instead of
 silently clamping to 2K.
 
+**Nano Banana 4K output dimensions depend on the aspect ratio** — the
+tier fixes the pixel *budget*, not the long side, so wide formats come
+back wider than 4096px. Expect these dimensions from the 4K tier
+(`nano-banana-pro-4k`, `nano-banana-2` at 4K):
+
+| Aspect | 4K output |
+|--------|-----------|
+| 1:1 | 4096 × 4096 |
+| 16:9 / 9:16 | 5504 × 3072 / 3072 × 5504 |
+| 3:2 / 2:3 | 5056 × 3392 / 3392 × 5056 |
+| 4:3 / 3:4 | 4800 × 3584 / 3584 × 4800 |
+| 21:9 | 6336 × 2688 |
+
+4K renders on this family take noticeably longer than 1K/2K —
+**2–5 minutes is normal**, which is another reason to keep the job
+polling budget at 10 minutes.
+
 <Callout kind="info">
   The synchronous `POST /v1/llm/images/generations` (and its OpenAI-compat
   twin `POST /v1/openai/images/generations`) holds the connection open
