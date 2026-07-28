@@ -28,62 +28,6 @@ tags:
     description: USDT payments and withdrawals
 
 paths:
-  /v1/auth/register:
-    post:
-      tags: [Authorization]
-      summary: Register new user
-      description: Register a new user account. A verification code will be sent to the email.
-      operationId: registerUser
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email, username, password]
-              properties:
-                email:
-                  type: string
-                  format: email
-                username:
-                  type: string
-                password:
-                  type: string
-                  minLength: 8
-      responses:
-        '200':
-          description: Registration initiated, verification code sent
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Response'
-
-  /v1/auth/confirm-registration:
-    post:
-      tags: [Authorization]
-      summary: Confirm registration
-      description: Confirm registration using the verification code sent to email.
-      operationId: confirmRegistration
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [temp_token, confirmation_code]
-              properties:
-                temp_token:
-                  type: string
-                confirmation_code:
-                  type: string
-      responses:
-        '200':
-          description: Registration confirmed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Response'
-
   /v1/auth/login:
     post:
       tags: [Authorization]
