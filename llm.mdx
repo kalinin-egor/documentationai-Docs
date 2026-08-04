@@ -264,7 +264,7 @@ returns a `video.url` — a failed or timed-out job costs nothing.
 | Kling 2.5 Turbo Pro | `kling-2-5-turbo-pro` | $0.315 | 5s or 10s, t2v / i2v |
 | Kling 2.6 | `kling-2-6` | $0.315 | Optional audio, 5s or 10s, t2v / i2v |
 | Kling 3.0 | `kling-3-0` | $0.504 | 720p / 1080p / 4K, audio, multi-shot to 15s |
-| Kling O3 (Video) | `kling-o3-video` | $0.150 | Premium audio video, 5s |
+| Kling O3 (Video) | `kling-o3-video` | from $0.076 / s | 720p / 1080p / 4K, native audio, 3–15s; t2v / i2v, first+last frame, reference images (≤4) + reference video |
 | Kling 2.6 Motion Control | `kling-2-6-motion-control` | $0.504 | 720p / 1080p video-to-video |
 | Kling 3.0 Motion Control | `kling-3-0-motion-control` | $0.756 | 720p / 1080p video-to-video |
 | Kling AI Avatar Pro | `kling-avatar-pro` | $1.035 | 1080p lip-sync, up to 15s |
@@ -315,6 +315,33 @@ can be 4, 6 or 8 seconds (default 8) and does not change the price.
   input image geometry).
 - On a provider fallback the charge follows the serving upstream's
   rate — the exact amount is always in the completion `cost_usd`.
+
+#### Kling O3
+
+Kling O3 is billed **per second, by resolution and audio flag**, for
+clips of 3–15 seconds (default 5). Prompts are capped at 2500
+characters.
+
+| Resolution | Audio off | Audio on |
+|------------|-----------|----------|
+| `720p` | $0.0756 / s | $0.1008 / s |
+| `1080p` (default) | $0.1008 / s | $0.1260 / s |
+| `4k` | $0.3780 / s | $0.3780 / s |
+
+- **Text-to-video** — prompt only; `aspect_ratio` is `16:9` (default),
+  `9:16` or `1:1`.
+- **Image-to-video** — `image_url` (start frame), optionally with
+  `last_frame_url` (end frame). The aspect ratio follows the frame.
+- **Reference-to-video** — up to **4 reference images** via
+  `reference_image_urls`, which define the subject/style.
+- **Video reference (video-to-video)** — `video_url` / `video_urls`
+  supply the motion and camera language. O3 consumes a reference clip
+  **only in reference-to-video mode**, so at least one
+  `reference_image_urls` entry must accompany it; a clip on its own is
+  rejected with a 400. `image_url` / `last_frame_url` may still ride
+  along as start / end anchors. For pure video-to-video with no
+  reference image, use `kling-2-6-motion-control` /
+  `kling-3-0-motion-control`.
 
 #### Seedance (ByteDance)
 
