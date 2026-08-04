@@ -264,7 +264,7 @@ returns a `video.url` — a failed or timed-out job costs nothing.
 | Kling 2.5 Turbo Pro | `kling-2-5-turbo-pro` | $0.315 | 5s or 10s, t2v / i2v |
 | Kling 2.6 | `kling-2-6` | $0.315 | Optional audio, 5s or 10s, t2v / i2v |
 | Kling 3.0 | `kling-3-0` | $0.504 | 720p / 1080p / 4K, audio, multi-shot to 15s |
-| Kling O3 (Video) | `kling-o3-video` | from $0.076 / s | 720p / 1080p / 4K, native audio, 3–15s; t2v / i2v, first+last frame, reference images (≤4) + reference video |
+| Kling O3 (Video) | `kling-o3-video` | from $0.076 / s | 720p / 1080p / 4K, native audio, 3–15s; t2v / i2v, first+last frame, reference images (≤4) |
 | Kling 2.6 Motion Control | `kling-2-6-motion-control` | $0.504 | 720p / 1080p video-to-video |
 | Kling 3.0 Motion Control | `kling-3-0-motion-control` | $0.756 | 720p / 1080p video-to-video |
 | Kling AI Avatar Pro | `kling-avatar-pro` | $1.035 | 1080p lip-sync, up to 15s |
@@ -333,15 +333,12 @@ characters.
 - **Image-to-video** — `image_url` (start frame), optionally with
   `last_frame_url` (end frame). The aspect ratio follows the frame.
 - **Reference-to-video** — up to **4 reference images** via
-  `reference_image_urls`, which define the subject/style.
-- **Video reference (video-to-video)** — `video_url` / `video_urls`
-  supply the motion and camera language. O3 consumes a reference clip
-  **only in reference-to-video mode**, so at least one
-  `reference_image_urls` entry must accompany it; a clip on its own is
-  rejected with a 400. `image_url` / `last_frame_url` may still ride
-  along as start / end anchors. For pure video-to-video with no
-  reference image, use `kling-2-6-motion-control` /
-  `kling-3-0-motion-control`.
+  `reference_image_urls`, which define the subject/style. `image_url` /
+  `last_frame_url` may ride along as start / end anchors.
+- **No reference video.** `video_url` / `video_urls` are rejected with a
+  400 on this model: the upstream accepts a clip at submit and then
+  fails the render. For video-to-video use
+  `kling-2-6-motion-control` / `kling-3-0-motion-control`.
 
 #### Seedance (ByteDance)
 
