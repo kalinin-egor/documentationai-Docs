@@ -457,6 +457,14 @@ use. On `seedance-2`, `aspect_ratio` additionally accepts `auto`,
 `21:9`, `4:3` and `3:4` — omit it in i2v mode to follow the input
 frame's geometry.
 
+`seedance-2` also accepts a `seed`. Be aware of what it actually buys:
+keeping the seed fixed while everything else stays identical makes two
+renders markedly more alike than two unseeded ones, but they will not
+be identical — the model is not bit-reproducible, so treat the seed as
+a similarity control rather than a repeat button. A seeded request is
+routed to the one upstream that implements the parameter; if that route
+is unavailable the clip is still rendered, without the seed.
+
 Reference-file limits: videos 2–15s combined, ≤50MB total; images
 JPG/PNG/WebP; audio MP3/WAV, ≤15s combined. **Video resolution and
 container are unrestricted** — 1080p/4K clips and non-MP4 formats
@@ -533,6 +541,7 @@ while time.time() < deadline:
 | `resolution` | string | no | Seedance 2: `480p` / `720p` (default) / `1080p` / `4k`, priced per second per resolution. Kling: `1080p` (default), `4k` (Kling 3.0 / O3 only). |
 | `audio` | bool | no | Default `false`. Kling 2.6 / 3.0 double the price when `true`; on Seedance 2 generates the clip's audio track. |
 | `mode` | string | no | `standard` / `pro` (default) / `master` for Kling 2.1; `turbo` for 2.5 Turbo Pro. |
+| `seed` | int | no | Seedance 2 only — integer in `[-1, 4294967295]`; omit or pass `-1` for a random seed. Reusing a seed with an otherwise identical request pulls the render toward the earlier one; it does **not** reproduce it frame for frame. Other models ignore the field. |
 
 ##### Response
 
