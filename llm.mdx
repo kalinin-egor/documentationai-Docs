@@ -767,7 +767,11 @@ user-facing price stays stable.
   "job_id": "vid_e93e98c7ca5e4982876b",
   "status": "completed",
   "model": "kling-2-6",
-  "video": { "url": "https://cdn.example.com/.../output.mp4" },
+  "video": {
+    "url": "https://cdn.example.com/.../output.mp4",
+    "stored_url": "https://api.gpuniq.com/v1/llm/media/8xK2p….mp4",
+    "stored_expires_in_days": 7
+  },
   "cost_usd": 0.315,
   "balance_usd": 9.17825791,
   "config": { "resolution": "1080p", "audio": false, "duration": 5, "task": "t2v", "mode": null }
@@ -775,6 +779,41 @@ user-facing price stays stable.
 ```
 
 The polling endpoint transparently falls back across internal routes if the first attempt fails — your `job_id` and the user-facing price stay stable across fallbacks. Internal route identifiers are deliberately omitted from the public response; they live only in admin/operator logs.
+
+##### Where delivered media lives
+
+Every generated image and video is also mirrored to GPUniq storage, and
+the response tells you where:
+
+| Field | What it is |
+|-------|-----------|
+| `video.url` / `image.b64_json` | the original delivery — live immediately, unchanged |
+| `video.stored_url` / `image.url` | a GPUniq-hosted copy at `https://api.gpuniq.com/v1/llm/media/{token}` |
+| `stored_expires_in_days` / `expires_in_days` | how long that copy is kept (**7 days** by default) |
+
+Why it matters: the upstream `video.url` points at the rendering
+provider's CDN, and its lifetime is set by them, not by us. If you store
+that link rather than the bytes, it can stop resolving well before you
+expect. `stored_url` is ours and lives exactly as long as the field says.
+
+<Callout kind="warning">
+  **This is a delivery buffer, not an archive.** Copies are deleted
+  automatically when the retention window closes and are not
+  recoverable afterwards. If you need media permanently, download it and
+  keep it on your own storage — treat `stored_url` as the safety net that
+  gets you from "the job finished" to "the bytes are in my bucket", not
+  as the bucket.
+</Callout>
+
+Two practical notes. For **images** the copy is written before the
+response is sent, so `url` works the moment you receive it. For
+**videos** the copy runs in the background — a clip is tens of megabytes
+and we would rather not make the delivering poll wait on it — so
+`stored_url` becomes valid shortly after the response; `url` is live
+immediately either way. And if storage is briefly unavailable the
+`stored_url` / `url` fields are simply absent: the generation still
+succeeds and is still delivered, because a storage hiccup is never
+allowed to fail a render you paid for.
 
 ### Upscaling & Enhancement (Topaz)
 
