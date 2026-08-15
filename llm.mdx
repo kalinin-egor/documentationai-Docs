@@ -46,10 +46,21 @@ You can use GPUniq LLMs two ways:
 
 | Slug | Input | Output | Category | Public discount |
 |------|-------|--------|----------|-----------------|
-| `MiniMax-M2.7` | $0.33 | $1.32 | balanced | −10% off API |
-| `MiniMax-M2.5` | $0.33 | $1.32 | balanced | −10% off API |
-| `MiniMax-M2.1` | $0.297 | $1.188 | balanced | −20% off API |
-| `MiniMax-M2` | $2.079 | $8.316 | flagship | −20% off API |
+| `MiniMax-M2.7` | $0.30 | $1.20 | balanced | — |
+| `MiniMax-M2.5` | $0.30 | $1.20 | balanced | — |
+| `MiniMax-M2.1` | $0.2925 | $1.17 | balanced | −7.5% off API |
+| `MiniMax-M2` | $0.2925 | $1.17 | flagship | −7.5% off API |
+
+<Callout kind="info">
+  **Repriced 2026-08-15.** `MiniMax-M2` was listed at $2.079 / $8.316 —
+  roughly 8× the market rate for these weights. The catalog's "official
+  price" anchor for the M2 family had been filled in with a
+  Claude-shaped figure that MiniMax has never charged; the discount
+  machinery then derived retail from it faithfully. The anchor is now
+  MiniMax's real list price and the whole family sits within a few
+  percent of what the same models cost elsewhere. Slug `minimax-m2.5`
+  (lowercase) is an alias of `MiniMax-M2.5` and prices identically.
+</Callout>
 
 ### Image Generation
 
@@ -120,15 +131,52 @@ back wider than 4096px. Expect these dimensions from the 4K tier
 **2–5 minutes is normal**, which is another reason to keep the job
 polling budget at 10 minutes.
 
-<Callout kind="info">
-  The synchronous `POST /v1/llm/images/generations` (and its OpenAI-compat
-  twin `POST /v1/openai/images/generations`) holds the connection open
-  for the full 5-minute upstream budget, which is plenty for every model
-  in the catalog. If you sit behind a CDN with a strict idle-read limit
-  (Cloudflare's free tier caps responses at ~100 s) and call from a
-  browser, prefer the **job-based API** below — it returns a `job_id` in
-  under a second and you poll `GET /v1/llm/images/jobs/{job_id}` every
-  2-3 s until completion.
+<Callout kind="warning">
+  **Use the job-based API. The synchronous endpoint is legacy.**
+
+  `POST /v1/llm/images/jobs` (below) is the supported path: it returns a
+  `job_id` in under a second, survives any CDN idle-read limit, and bills
+  only on delivery. The synchronous `POST /v1/llm/images/generations`
+  (and its OpenAI-compat twin `POST /v1/openai/images/generations`) holds
+  the connection open for the full 5-minute upstream budget and is kept
+  only for the slugs the job API does not carry yet — see
+  [Which endpoint serves which slug](#which-endpoint-serves-which-slug).
+  Do not build new integrations on it.
+
+  A held-open request is also the one that loses work: if the client
+  disconnects mid-render the image is still generated and still billed,
+  but you never receive it. Jobs have no such failure mode.
+</Callout>
+
+<Callout kind="warning">
+  **Getting `403` with `error code: 1010` on any endpoint? That is not
+  the endpoint — it is your HTTP client's User-Agent.**
+
+  Our edge blocks the default `Python-urllib/3.x` User-Agent outright.
+  The block is UA-based and applies to *every* route equally — sync,
+  async, chat — so it is easy to misread as "the synchronous endpoint is
+  broken" when the async one fails identically. `requests`, `httpx`,
+  `curl`, the official SDKs and any client that sets its own UA are all
+  unaffected.
+
+  ```python
+  # 403, error code 1010 — blocked at the edge, never reaches the API
+  urllib.request.urlopen(urllib.request.Request(url, data=body))
+
+  # Works — requests sends its own User-Agent
+  requests.post(url, json=payload, headers={"X-API-Key": KEY})
+
+  # Works — urllib with an explicit User-Agent
+  req = urllib.request.Request(url, data=body, headers={
+      "X-API-Key": KEY,
+      "Content-Type": "application/json",
+      "User-Agent": "my-app/1.0",     # <- the one line that matters
+  })
+  ```
+
+  A `1010` body is always plain text, never our JSON envelope. If you get
+  JSON back, the request reached us and the error is a real API error —
+  look it up in the [Error Reference](/llm/errors).
 </Callout>
 
 #### Job-based image generation (recommended)
@@ -186,11 +234,26 @@ while time.time() < deadline:
         break
 ```
 
-The job API accepts the Nano Banana slugs and `gpt-image-2`. `n` must be
-`1` — issue separate jobs in parallel for batches. The other image slugs
-in the catalog above are served only on the synchronous endpoint.
-(Topaz upscaling/enhancement has its own dedicated job surface — see the
-[Topaz guide](/llm/topaz).)
+#### Which endpoint serves which slug
+
+`n` must be `1` on the job API — issue separate jobs in parallel for
+batches. (Topaz upscaling/enhancement has its own dedicated job surface —
+see the [Topaz guide](/llm/topaz).)
+
+| Slugs | Job API (`/images/jobs`) | Sync (`/images/generations`) |
+|-------|--------------------------|------------------------------|
+| `nano-banana`, `nano-banana-2`, `nano-banana-pro`, `nano-banana-pro-4k` | ✅ use this | legacy |
+| `gpt-image-2`, `gpt-image-2-2k`, `gpt-image-2-4k` | ✅ use this | legacy |
+| every other image slug in the table above | ✖ not carried yet | required |
+
+For the third row the synchronous endpoint is currently the only way in.
+It works — set a sane client timeout (300 s) and a real User-Agent — but
+treat it as a temporary arrangement: those slugs move to the job API as
+they are onboarded, and the job API is where new capability lands.
+
+**Video has no synchronous endpoint at all.** Every video generation goes
+through `POST /v1/llm/videos/jobs` — there is nothing to migrate and no
+sync variant to find.
 
 #### Generating an image inside a chat session
 
@@ -300,9 +363,18 @@ can be 4, 6 or 8 seconds (default 8) and does not change the price.
 
 | Resolution | Lite | Fast | Quality |
 |------------|------|------|---------|
-| `720p` (default) | $0.30 | $0.60 | $2.50 |
-| `1080p` | $0.35 | $0.65 | $2.55 |
+| `720p` | $0.30 | $0.60 | $2.50 |
+| `1080p` **(default)** | $0.35 | $0.65 | $2.55 |
 | `4k` | $1.50 | $1.80 | $3.70 |
+
+<Callout kind="info">
+  **Omitting `resolution` gives you 1080p, not 720p** — the video job
+  surface defaults to 1080p across the whole Kling/Veo family, so the
+  cheapest row is opt-in. Pass `"resolution": "720p"` explicitly if that
+  is what you are budgeting for. The kickoff response echoes the resolved
+  value in `config.resolution` and prices it in `estimated_cost_usd`, so
+  you can always check before the render runs.
+</Callout>
 
 - **First + last frame** — `image_url` (first frame) + `last_frame_url`
   (last frame) on **all three tiers**; the clip interpolates between
@@ -529,7 +601,7 @@ while time.time() < deadline:
 |-------|------|----------|-------|
 | `model` | string | yes | Slug from the table above. |
 | `prompt` | string | yes | Up to 4000 characters. |
-| `duration` | int | no | Seconds; valid range depends on model (5 / 10 for most Kling, 1-15 for Avatar). |
+| `duration` | int | no | Seconds. **Every model has its own legal set — see the [duration matrix](#duration-by-model) below.** An out-of-range value is a 400, not a silent clamp. |
 | `aspect_ratio` | string | no | `16:9` (default), `9:16`, `1:1` where supported. Seedance 2 additionally accepts `auto`, `21:9`, `4:3`, `3:4`. |
 | `image_url` | string | no | https URL or data URI — enables image-to-video (start frame). |
 | `last_frame_url` | string | no | https URL or data URI — end frame for first/last-frame interpolation. Supported on Kling 2.1-Pro / 2.6 / 3.0 / O3, Veo 3.1 (all tiers) and Seedance 2. Requires `image_url`. The first image is always the FIRST frame, the second the LAST — order matters. |
@@ -538,10 +610,123 @@ while time.time() < deadline:
 | `reference_image_urls` | array | no | Seedance 2 only — up to 9 https URLs / data URIs of subject or style reference images (JPG/PNG/WebP). Switches the job to reference-to-video mode. |
 | `audio_url` | string | no | Seedance 2 only — reference audio track (MP3/WAV). Requires at least one image or video reference in the same request. |
 | `audio_urls` | array | no | Seedance 2 only — up to 3 reference audio tracks, ≤15s combined; merged with `audio_url`. |
-| `resolution` | string | no | Seedance 2: `480p` / `720p` (default) / `1080p` / `4k`, priced per second per resolution. Kling: `1080p` (default), `4k` (Kling 3.0 / O3 only). |
+| `resolution` | string | no | Seedance 2: `480p` / `720p` (default) / `1080p` / `4k`, priced per second per resolution. Kling 3.0 / O3: `720p` / `1080p` (default) / `4k`. Kling 2.6 / 3.0 **Motion Control**: `720p` / `1080p` (default). Veo 3.1: `720p` / `1080p` / `4k`. Kling 2.1 / 2.5 Turbo Pro: `1080p` only. **Default is `1080p` for every Kling/Veo SKU when the field is omitted** — Seedance 2 is the exception at `720p`. |
 | `audio` | bool | no | Default `false`. Kling 2.6 / 3.0 double the price when `true`; on Seedance 2 generates the clip's audio track. |
 | `mode` | string | no | `standard` / `pro` (default) / `master` for Kling 2.1; `turbo` for 2.5 Turbo Pro. |
 | `seed` | int | no | Seedance 2 only — integer in `[-1, 4294967295]`; omit or pass `-1` for a random seed. Reusing a seed with an otherwise identical request pulls the render toward the earlier one; it does **not** reproduce it frame for frame. Other models ignore the field. |
+
+##### Duration by model
+
+`duration` is **not** a free integer. Each family accepts its own set and
+anything outside it comes back as a 400 naming the legal values — we do
+not round to the nearest supported length, because silently rendering
+(and billing) 8 seconds when you asked for 5 is worse than a refusal.
+
+| Model | Legal `duration` | Default |
+|-------|------------------|---------|
+| `veo-3-1-lite` / `veo-3-1-fast` / `veo-3-1-quality` | **4, 6 or 8 — nothing else** | 8 |
+| `veo-3-1-fast` / `-lite` *with* `reference_image_urls` | **8 only** | 8 |
+| `kling-2-1`, `kling-2-5-turbo-pro`, `kling-2-6` | 5 or 10 | 5 |
+| `kling-3-0` | 5 or 10 (multi-shot to 15) | 5 |
+| `kling-o3-video` | any integer 3–15 | 5 |
+| `kling-2-6-motion-control`, `kling-3-0-motion-control` | 5 or 10 | 5 |
+| `kling-avatar-pro`, `kling-avatar-standard` | any integer 1–15 | 5 |
+| `seedance-2` | any integer 4–15 | 5 |
+| `seedance-1-0-pro`, `seedance-1-5-pro` | 5 | 5 |
+| `sora-2-video`, `sora-2-pro-video` | 10 | 10 |
+| `sora-2-official`, `sora-2-pro-official` | 8 | 8 |
+
+<Callout kind="warning">
+  **Veo does not take `duration: 5`.** It is the single most common 400 on
+  this surface — 5 is the default nearly everywhere else in the catalog,
+  so it gets copied across from a Kling example. Veo's native set is
+  4 / 6 / 8; ask for 5 and you get
+  `invalid_request: Veo 3.1 supports durations of 4, 6 or 8 seconds (got 5)`.
+</Callout>
+
+##### Reference media: what format to send
+
+Every media field takes a **URL string**, never an uploaded file part —
+there is no multipart endpoint. Two forms are accepted:
+
+| Form | Looks like | Where it works |
+|------|-----------|----------------|
+| Public HTTPS URL | `https://cdn.example.com/ref.jpg` | **every** media field |
+| Data URI (base64 inline) | `data:image/jpeg;base64,/9j/4AAQ…` | image fields only — `image_url`, `last_frame_url`, `reference_image_urls` |
+
+**Video and audio references must be public HTTPS URLs.** `video_url`,
+`video_urls`, `audio_url` and `audio_urls` reject `data:` URIs — the
+upstreams fetch these server-side and will not accept an inline blob.
+
+What the fetch actually requires, in the order things usually go wrong:
+
+1. **A direct link to the file**, not to a viewer page. The response must
+   be the bytes themselves.
+2. **A media `Content-Type`** — `video/mp4`, `image/jpeg`, `audio/mpeg`.
+   A generic `application/octet-stream` is rejected by the upstream
+   validator even when the bytes are a perfectly good MP4.
+3. **No authentication, no redirect chain to a login page.** The fetcher
+   is anonymous and has no cookies.
+4. **A file extension that matches the content** where possible — some
+   upstreams sniff the URL path before they sniff the body.
+
+<Callout kind="warning">
+  **Google Drive / Dropbox / OneDrive share links do not work**, including
+  the `uc?export=download` variants. Drive serves the file as
+  `application/octet-stream` with `X-Content-Type-Options: nosniff` and
+  the original filename (`IMG_3752.MOV`), which fails requirement 2 above
+  — the job is rejected at submit with a reference-media error. This is
+  the single most common cause of "my motion-control job will not start".
+
+  Host reference clips on S3 / R2 / any static bucket with the correct
+  `Content-Type`, or on your own web server. If you cannot host, convert
+  the clip and use an image-only mode instead: `image_url` and
+  `reference_image_urls` both accept `data:` URIs, so images need no
+  hosting at all.
+</Callout>
+
+Size and format limits:
+
+| Field | Formats | Limits |
+|-------|---------|--------|
+| `image_url`, `last_frame_url` | JPG, PNG, WebP | one image each |
+| `reference_image_urls` | JPG, PNG, WebP | ≤9 Seedance 2 · ≤4 Kling O3 · ≤3 Veo 3.1 fast/lite |
+| `video_url`, `video_urls` | any common container (MP4, WebM, MKV, MOV) | ≤3 clips, 2–15 s combined, ≤50 MB total |
+| `audio_url`, `audio_urls` | MP3, WAV | ≤3 tracks, ≤15 s combined |
+
+Reference **video** resolution and container are unrestricted: 1080p/4K
+and non-MP4 sources are transcoded to ≤720p MP4 on our side before
+dispatch, so send source footage as-is. Keep in mind that a data URI
+inflates by ~33% over the raw bytes and counts against the request body
+limit — for anything above a few MB, host it and send a URL.
+
+##### Which model takes which reference input
+
+Sending a field the chosen model has no input for is a **400 at submit**,
+not a silent drop. That is deliberate: previously a request carrying
+`reference_image_urls` could render on one attempt and be refused on the
+next, depending on which internal route served it. Capability is now
+resolved before dispatch, so the same request gets the same answer every
+time.
+
+| Model | `image_url` | `last_frame_url` | `reference_image_urls` | `video_url` |
+|-------|-------------|------------------|------------------------|-------------|
+| `seedance-2` | ✅ | ✅ | ✅ ≤9 | ✅ ≤3 |
+| `kling-o3-video` | ✅ | ✅ | ✅ ≤4 | ✖ |
+| `veo-3-1-fast` / `veo-3-1-lite` | ✅ | ✅ | ✅ ≤3 (8 s only) | ✖ |
+| `veo-3-1-quality` | ✅ | ✅ | ✖ | ✖ |
+| `kling-2-6-motion-control` / `kling-3-0-motion-control` | ✅ **required** | ✖ | ✖ | ✅ **required** |
+| `kling-2-1`, `kling-2-5-turbo-pro`, `kling-2-6`, `kling-3-0` | ✅ | ✅ (2.1/2.6/3.0) | ✖ | ✖ |
+| `seedance-1-0-pro`, `seedance-1-5-pro` | ✅ | ✖ | ✖ | ✖ |
+
+For subject or style reference on a model with no `reference_image_urls`
+column, use `image_url` as the start frame — or move to `seedance-2`,
+which has the widest reference surface in the catalog.
+
+Motion control is the strictest shape here: `kling-2-6-motion-control`
+and `kling-3-0-motion-control` need **both** `image_url` (the character /
+subject frame) and `video_url` (the motion to transfer). Either one alone
+is a 400 naming the missing field.
 
 ##### Response
 
@@ -738,9 +923,19 @@ tried within the same HTTP request — you still see one synchronous
 
 Heavy generations (Pro / 4K, multi-image batches, high-quality preset)
 can run up to **5 minutes** end-to-end; the connection is held open for
-that whole budget so SDKs never need to re-poll. For interactive UIs
-that cannot keep an HTTP connection open that long, prefer the
-[job-based API](#job-based-image-generation-recommended).
+that whole budget so SDKs never need to re-poll.
+
+<Callout kind="warning">
+  **This synchronous surface is legacy.** It exists so OpenAI-SDK code
+  runs unmodified against GPUniq, and it remains the only route for the
+  image slugs the job API does not carry yet — see
+  [Which endpoint serves which slug](#which-endpoint-serves-which-slug).
+  For anything new, use the
+  [job-based API](#job-based-image-generation-recommended): it returns in
+  under a second, cannot be killed by a proxy's idle-read limit, and
+  bills only on delivery. On this endpoint a client that disconnects
+  mid-render is still charged for an image it never receives.
+</Callout>
 
 <CodeGroup>
 ```python Python (OpenAI SDK)

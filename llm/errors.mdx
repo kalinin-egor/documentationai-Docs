@@ -166,6 +166,7 @@ The response carries `Retry-After` (seconds), `X-RateLimit-Limit`, `X-RateLimit-
 | `code` | HTTP | OpenAI `type` | When |
 |---|---|---|---|
 | `streaming_required` | 400 | `invalid_request_error` | A non-streaming request asked for more than `NON_STREAM_MAX_TOKENS` output tokens (default **4096**). Buffered responses past that length routinely lose to the ~100 s edge-proxy timeout — retry with `stream: true`. The error's `error.meta` carries `max_tokens`, `limit`, and a `hint` field. |
+| `empty_upstream_stream` | 200 (SSE frame) | `api_error` | Every eligible upstream accepted the request and then closed the stream without emitting a single token. Delivered as an SSE error frame followed by `[DONE]`; **nothing is billed**. Retry, or resend with `"stream": false`. |
 
 This is the most common reason a previously-working integration breaks after a GPUniq update. The full recovery recipe lives in the [Long generations](/llm/long-generations) guide.
 
@@ -335,6 +336,36 @@ Video kickoff errors fold into the tables above, but a few combinations come up 
 
 **Fix:** re-kick off the job. The stall rate observed in production is ~10-20% on the most-flaky SKUs; healthy jobs complete in 30-90s.
 
+**5. `no_provider_available` — the model has no such reference input.** Returned when the request carries `reference_image_urls` (or `image_url`) but the chosen model has no route that implements it. Since 2026-08-15 this is resolved *before* dispatch, so the answer is deterministic: the same request always gets the same verdict.
+
+```jsonc
+{
+  "exception": 400,
+  "data": {
+    "error": "'kling-2-5-turbo-pro' has no reference-to-video input on any currently routed provider — `reference_image_urls` would be silently ignored. Reference images are supported on `seedance-2`, `kling-o3-video` and `veo-3-1-fast` / `veo-3-1-lite`. For this model pass `image_url` (start frame) instead, or switch model.",
+    "error_code": "no_provider_available",
+    "meta": { "slug": "kling-2-5-turbo-pro", "request_id": "…" }
+  },
+  "message": "Конфигурация не поддерживается"
+}
+```
+
+**Fix:** follow the error — either drop the field or move to a model that has the input. The per-model matrix is in [Which model takes which reference input](/llm#which-model-takes-which-reference-input).
+
+<Callout kind="info">
+  **If you saw this combination succeed before, you were not imagining
+  it.** Until 2026-08-15 the routing chain could hand a reference-image
+  job to an internal route with no such field: identical requests
+  rendered or were refused depending on which route won the cost sort
+  that minute. Capability is now checked before dispatch — a request that
+  can be served is served, and one that cannot is refused immediately
+  with the message above, every time.
+</Callout>
+
+**6. Reference media rejected at submit.** The upstream fetched your `video_url` / `image_url` and refused it. Almost always the host, not the file: the fetch needs a direct link, a real media `Content-Type` (`video/mp4`, not `application/octet-stream`), and no auth. Google Drive / Dropbox share links fail this — see [Reference media: what format to send](/llm#reference-media-what-format-to-send).
+
+**Fix:** re-host on S3/R2 or any static bucket with the right `Content-Type`. For *images* only, sidestep hosting entirely by sending a `data:` URI; video and audio references must be HTTPS URLs.
+
 ### Catch-all
 
 | `code` | HTTP | OpenAI `type` | When |
@@ -342,6 +373,39 @@ Video kickoff errors fold into the tables above, but a few combinations come up 
 | `internal_error` | 500 | `api_error` | Unexpected server-side error — see `request_id` and contact support. |
 
 ## Common scenarios
+
+### "I get a bare `403` with `error code: 1010` and no JSON."
+
+This never reached the API. Our edge blocks the default
+`Python-urllib/3.x` User-Agent, and the block applies to every route
+equally — so it looks like "endpoint X is broken" until you notice that
+endpoint Y fails identically. The giveaway is the body: `1010` is plain
+text, while every real API error is a JSON envelope carrying a
+`request_id`.
+
+**Fix:** send any other User-Agent. `requests`, `httpx`, `curl` and the
+official SDKs already do. With bare `urllib`, add the header yourself:
+
+```python
+req = urllib.request.Request(url, data=body, headers={
+    "X-API-Key": KEY,
+    "Content-Type": "application/json",
+    "User-Agent": "my-app/1.0",
+})
+```
+
+### "A streaming request returns HTTP 200 with an empty body."
+
+Fixed as of 2026-08-15. An upstream that accepted the request and then
+streamed nothing used to end the response with zero bytes and no error —
+a silent empty success. The stream now holds its first bytes back until
+an upstream proves it is answering, so a silent upstream fails over to
+the next one instead. If every upstream is silent you get an
+`empty_upstream_stream` error frame and are charged nothing.
+
+**Fix:** retry. If it persists on one model, report it with the
+`request_id` — the failure is recorded server-side as
+`empty_upstream_stream` and is visible to the operator.
 
 ### "I get `streaming_required` on a request that used to work."
 
