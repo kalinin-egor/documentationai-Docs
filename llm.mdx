@@ -139,9 +139,9 @@ polling budget at 10 minutes.
   only on delivery. The synchronous `POST /v1/llm/images/generations`
   (and its OpenAI-compat twin `POST /v1/openai/images/generations`) holds
   the connection open for the full 5-minute upstream budget and is kept
-  only for the slugs the job API does not carry yet — see
-  [Which endpoint serves which slug](#which-endpoint-serves-which-slug).
-  Do not build new integrations on it.
+  only so existing OpenAI-SDK code keeps running. **The job API now
+  covers every image slug in the catalog** — there is no model that
+  requires the synchronous route. Do not build new integrations on it.
 
   A held-open request is also the one that loses work: if the client
   disconnects mid-render the image is still generated and still billed,
@@ -236,24 +236,41 @@ while time.time() < deadline:
 
 #### Which endpoint serves which slug
 
-`n` must be `1` on the job API — issue separate jobs in parallel for
-batches. (Topaz upscaling/enhancement has its own dedicated job surface —
-see the [Topaz guide](/llm/topaz).)
+**Every image slug in the catalog works on the job API.** There is no
+subset to memorise and no reason to keep a synchronous code path around:
+if the model is in the table above, `POST /v1/llm/images/jobs` accepts it.
 
-| Slugs | Job API (`/images/jobs`) | Sync (`/images/generations`) |
-|-------|--------------------------|------------------------------|
-| `nano-banana`, `nano-banana-2`, `nano-banana-pro`, `nano-banana-pro-4k` | ✅ use this | legacy |
-| `gpt-image-2`, `gpt-image-2-2k`, `gpt-image-2-4k` | ✅ use this | legacy |
-| every other image slug in the table above | ✖ not carried yet | required |
+`n` must be `1` — issue separate jobs in parallel for batches. (Topaz
+upscaling/enhancement has its own dedicated job surface — see the
+[Topaz guide](/llm/topaz).)
 
-For the third row the synchronous endpoint is currently the only way in.
-It works — set a sane client timeout (300 s) and a real User-Agent — but
-treat it as a temporary arrangement: those slugs move to the job API as
-they are onboarded, and the job API is where new capability lands.
+Behind the job id there are two execution modes, and the difference is
+not visible in the API contract — same kickoff, same polling, same
+response shape:
+
+| Mode | Slugs | Typical kickoff → first `completed` poll |
+|------|-------|------------------------------------------|
+| Native async upstream | Nano Banana line, `gpt-image-2` family | unchanged |
+| Server-side render behind the job id | everything else in the catalog | unchanged for the client; the render occupies a worker rather than an upstream queue |
+
+The second mode runs the same multi-tier provider cascade the synchronous
+endpoint uses, so failover, moderation verdicts and format conversion all
+behave identically. You are still charged only on delivery.
 
 **Video has no synchronous endpoint at all.** Every video generation goes
 through `POST /v1/llm/videos/jobs` — there is nothing to migrate and no
 sync variant to find.
+
+<Callout kind="info">
+  **Migrating off the synchronous endpoint.** The job API is a drop-in
+  replacement for `POST /v1/llm/images/generations` for every slug: send
+  the same body to `/images/jobs`, read `data.job_id`, then poll
+  `GET /v1/llm/images/jobs/{job_id}` until `status` is terminal. The
+  image arrives as `data.image.b64_json`, and `data.cost_usd` /
+  `data.balance_usd` replace the sync response's equivalents. The only
+  behavioural difference is the one you want: a dropped connection can no
+  longer cost you an image you never receive.
+</Callout>
 
 #### Generating an image inside a chat session
 
@@ -927,9 +944,9 @@ that whole budget so SDKs never need to re-poll.
 
 <Callout kind="warning">
   **This synchronous surface is legacy.** It exists so OpenAI-SDK code
-  runs unmodified against GPUniq, and it remains the only route for the
-  image slugs the job API does not carry yet — see
-  [Which endpoint serves which slug](#which-endpoint-serves-which-slug).
+  runs unmodified against GPUniq — it is no longer the only route for any
+  model, since the job API now covers the whole image catalog (see
+  [Which endpoint serves which slug](#which-endpoint-serves-which-slug)).
   For anything new, use the
   [job-based API](#job-based-image-generation-recommended): it returns in
   under a second, cannot be killed by a proxy's idle-read limit, and
