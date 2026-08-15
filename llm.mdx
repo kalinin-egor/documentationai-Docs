@@ -622,8 +622,8 @@ while time.time() < deadline:
 | `aspect_ratio` | string | no | `16:9` (default), `9:16`, `1:1` where supported. Seedance 2 additionally accepts `auto`, `21:9`, `4:3`, `3:4`. |
 | `image_url` | string | no | https URL or data URI — enables image-to-video (start frame). |
 | `last_frame_url` | string | no | https URL or data URI — end frame for first/last-frame interpolation. Supported on Kling 2.1-Pro / 2.6 / 3.0 / O3, Veo 3.1 (all tiers) and Seedance 2. Requires `image_url`. The first image is always the FIRST frame, the second the LAST — order matters. |
-| `video_url` | string | no | https URL — reference clip for motion-control v2v variants and Seedance 2 reference-to-video. |
-| `video_urls` | array | no | Up to 3 https URLs — multiple reference clips for reference-to-video (Seedance 2). Single-reference models use the first entry. |
+| `video_url` | string | no | https URL or `data:` URI — reference clip for motion-control v2v variants and Seedance 2 reference-to-video. Links the host serves as a non-video `Content-Type` are re-hosted automatically. |
+| `video_urls` | array | no | Up to 3 https URLs or `data:` URIs — multiple reference clips for reference-to-video (Seedance 2). Single-reference models use the first entry. |
 | `reference_image_urls` | array | no | Seedance 2 only — up to 9 https URLs / data URIs of subject or style reference images (JPG/PNG/WebP). Switches the job to reference-to-video mode. |
 | `audio_url` | string | no | Seedance 2 only — reference audio track (MP3/WAV). Requires at least one image or video reference in the same request. |
 | `audio_urls` | array | no | Seedance 2 only — up to 3 reference audio tracks, ≤15s combined; merged with `audio_url`. |
@@ -669,38 +669,45 @@ there is no multipart endpoint. Two forms are accepted:
 | Form | Looks like | Where it works |
 |------|-----------|----------------|
 | Public HTTPS URL | `https://cdn.example.com/ref.jpg` | **every** media field |
-| Data URI (base64 inline) | `data:image/jpeg;base64,/9j/4AAQ…` | image fields only — `image_url`, `last_frame_url`, `reference_image_urls` |
+| Data URI (base64 inline) | `data:image/jpeg;base64,/9j/4AAQ…` | **every** media field |
 
-**Video and audio references must be public HTTPS URLs.** `video_url`,
-`video_urls`, `audio_url` and `audio_urls` reject `data:` URIs — the
-upstreams fetch these server-side and will not accept an inline blob.
+Upstream renderers only accept URLs, so a `data:` URI on a video or audio
+field is materialised into a real link on our side before dispatch. You
+do not have to host anything yourself to use a reference clip.
 
-What the fetch actually requires, in the order things usually go wrong:
+**Hosted links are re-hosted when the host misdescribes them.** Upstream
+validators judge a reference clip by the `Content-Type` the host
+declares, not by the bytes — so a perfectly good MP4 served as
+`application/octet-stream` used to be refused on sight. GPUniq now probes
+that header and, when it is not a `video/*` type, fetches the file and
+re-serves it correctly before dispatch.
+
+<Callout kind="info">
+  **Google Drive / Dropbox / OneDrive share links now work.** Drive
+  serves files as `application/octet-stream` with
+  `X-Content-Type-Options: nosniff` and the original filename
+  (`IMG_3752.MOV`), which upstream validators reject — this was the single
+  most common cause of "my motion-control job will not start". Such links
+  are re-hosted automatically as of 2026-08-15.
+
+  The link must still be **directly downloadable without signing in** —
+  set the share to "anyone with the link", and use the
+  `uc?export=download&id=…` form rather than a `/view` page. A link that
+  returns an HTML sign-in page has no file behind it for us to fetch.
+</Callout>
+
+Serving a reference from a bucket with the right `Content-Type` is still
+the fastest path: it skips the extra fetch entirely. What the upstream
+fetch requires, in the order things usually go wrong:
 
 1. **A direct link to the file**, not to a viewer page. The response must
    be the bytes themselves.
-2. **A media `Content-Type`** — `video/mp4`, `image/jpeg`, `audio/mpeg`.
-   A generic `application/octet-stream` is rejected by the upstream
-   validator even when the bytes are a perfectly good MP4.
-3. **No authentication, no redirect chain to a login page.** The fetcher
+2. **No authentication, no redirect chain to a login page.** The fetcher
    is anonymous and has no cookies.
+3. **A media `Content-Type`** — `video/mp4`, `image/jpeg`, `audio/mpeg`.
+   Handled for you when it is wrong, at the cost of one extra round trip.
 4. **A file extension that matches the content** where possible — some
    upstreams sniff the URL path before they sniff the body.
-
-<Callout kind="warning">
-  **Google Drive / Dropbox / OneDrive share links do not work**, including
-  the `uc?export=download` variants. Drive serves the file as
-  `application/octet-stream` with `X-Content-Type-Options: nosniff` and
-  the original filename (`IMG_3752.MOV`), which fails requirement 2 above
-  — the job is rejected at submit with a reference-media error. This is
-  the single most common cause of "my motion-control job will not start".
-
-  Host reference clips on S3 / R2 / any static bucket with the correct
-  `Content-Type`, or on your own web server. If you cannot host, convert
-  the clip and use an image-only mode instead: `image_url` and
-  `reference_image_urls` both accept `data:` URIs, so images need no
-  hosting at all.
-</Callout>
 
 Size and format limits:
 

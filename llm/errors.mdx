@@ -362,9 +362,9 @@ Video kickoff errors fold into the tables above, but a few combinations come up 
   with the message above, every time.
 </Callout>
 
-**6. Reference media rejected at submit.** The upstream fetched your `video_url` / `image_url` and refused it. Almost always the host, not the file: the fetch needs a direct link, a real media `Content-Type` (`video/mp4`, not `application/octet-stream`), and no auth. Google Drive / Dropbox share links fail this — see [Reference media: what format to send](/llm#reference-media-what-format-to-send).
+**6. Reference media rejected at submit.** The upstream fetched your `video_url` / `image_url` and refused it. Since 2026-08-15 the two most common causes are handled for you: a link whose host declares the wrong `Content-Type` (`application/octet-stream` instead of `video/mp4` — the Google Drive case) is re-hosted automatically, and `data:` URIs are materialised into real links on every media field. What remains is a link with **no fetchable file behind it** — a `/view` page, a sign-in redirect, or a share that is not set to "anyone with the link". See [Reference media: what format to send](/llm#reference-media-what-format-to-send).
 
-**Fix:** re-host on S3/R2 or any static bucket with the right `Content-Type`. For *images* only, sidestep hosting entirely by sending a `data:` URI; video and audio references must be HTTPS URLs.
+**Fix:** open the URL in a private browser window. If you do not get the file itself, neither do we — make the share public and use a direct-download link, or send the clip as a `data:` URI and skip hosting entirely.
 
 ### Catch-all
 
