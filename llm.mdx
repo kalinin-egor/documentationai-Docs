@@ -29,8 +29,6 @@ You can use GPUniq LLMs two ways:
 
 | Slug | Input | Output | Category | Notes |
 |------|-------|--------|----------|-------|
-| `deepseek-v4-pro` | $2.40 | $4.00 | flagship | V4 family flagship |
-| `deepseek-v4-flash` | $0.18 | $0.30 | fast | V4 family fast tier |
 | `deepseek-v3.2` | $2.16 | $3.24 | flagship | Latest flagship general model |
 | `deepseek-v3.2-thinking` | $0.30 | $0.45 | reasoning | Reasoning-tuned V3.2 (very cheap) |
 | `deepseek-v3.1` | $4.32 | $12.96 | flagship | Previous flagship |
@@ -41,6 +39,28 @@ You can use GPUniq LLMs two ways:
 | `deepseek-reasoner` | $0.30 | $0.45 | reasoning | Reasoning-focused alias |
 | `deepseek-chat` | $0.29 | $1.17 | balanced | Conversational alias |
 | `deepseek-ocr` | $0.23 | $0.23 | fast | OCR model |
+
+#### DeepSeek V4 — priced live, not from a table
+
+`deepseek-v4-pro` and `deepseek-v4-flash` are open-weight, so they sit in the
+**open-weight tier**: the price is not a fixed catalog number but the *cheapest
+live rate available for those weights*, plus our margin. It moves as the market
+moves, which is why it is deliberately absent from the table above — any number
+printed here would be stale within days.
+
+Read the live figure from `GET /v1/llm/models`, or the model card in
+[/chat](https://gpuniq.com/chat). As of 2026-08-16 that resolves to roughly
+$0.52 / $1.04 for `deepseek-v4-pro` and $0.09 / $0.18 for `deepseek-v4-flash`
+per 1M tokens — in both cases at or below what DeepSeek's own API charges for
+the same model.
+
+<Callout kind="info">
+  **Corrected 2026-08-16.** `deepseek-v4-pro` had been billing off a
+  representative rate rather than the cheapest one, which put it around 4×
+  DeepSeek's official API. It now tracks the floor, as the open-weight tier
+  always intended. `deepseek-v4-flash` was unaffected and was already below
+  DeepSeek's own price.
+</Callout>
 
 #### MiniMax pricing (USD per 1M tokens)
 
