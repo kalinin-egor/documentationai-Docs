@@ -1084,7 +1084,13 @@ curl -X POST https://api.gpuniq.com/v1/openai/images/generations \
 </ParamField>
 
 <ParamField body="prompt" type="string" required>
-  Text description of the image you want. Up to 4000 characters.
+  Text description of the image you want. Up to 20 000 characters, but the
+  per-model ceiling is lower on several models — 1 000 on `gpt-4o-image`,
+  `gpt-image-1-5` and `z-image`, 2 000 on the FLUX Kontext and Kling
+  image models, 3 000 on `seedream-4-5` / `seedream-5-0-lite`, 5 000 on
+  `nano-banana`, `seedream-4`, `flux-2-*` and `wan-2-7-*`. Over the limit
+  you get an `UPSTREAM_VALIDATION_ERROR` naming the ceiling rather than a
+  truncated render.
 </ParamField>
 
 <ParamField body="n" type="integer" default="1">
@@ -1092,13 +1098,33 @@ curl -X POST https://api.gpuniq.com/v1/openai/images/generations \
 </ParamField>
 
 <ParamField body="size" type="string">
-  Output resolution and shape hint forwarded to the upstream. Accepts
-  `WIDTHxHEIGHT` (e.g. `1024x1024`, `2048x2048`, `4096x4096`), a bare tier
-  (`1k` / `2k` / `4k`), or an aspect-ratio string (`1:1`, `16:9`, `21:9`, …)
-  when you care about shape rather than exact pixels. `nano-banana-2`
+  Output resolution and shape. Accepts `WIDTHxHEIGHT` (e.g. `1024x1024`,
+  `2048x2048`, `4096x4096`), a bare tier (`1k` / `2k` / `4k`), or an
+  aspect-ratio string (`1:1`, `16:9`, `21:9`, …) when you care about shape
+  rather than exact pixels.
+
+  **Each model has its own set of output shapes** (below). A value that
+  isn't in the model's own set is snapped to the closest listed shape —
+  never dropped and never passed through unchanged. `nano-banana-2`
   renders 1K–4K (default 2K); `nano-banana-pro` renders 1K–2K (use
-  `nano-banana-pro-4k` for 4K, default 4096); wide ratios like `21:9` are
-  supported across the Nano Banana line.
+  `nano-banana-pro-4k` for 4K).
+
+  | Model | Accepted `size` |
+  | --- | --- |
+  | `nano-banana` | `1:1` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `9:16` `16:9` `21:9` |
+  | `nano-banana-2`, `nano-banana-pro`, `nano-banana-pro-4k` | `auto` + the ratios above |
+  | `gpt-image-2` (and the `-2k` / `-4k` tiers) | `auto` + the ratios above; exact `WIDTHxHEIGHT` on the 2K/4K tiers. 4K needs a non-square shape |
+  | `gpt-image-1-5` | `1024x1024`, `1024x1536`, `1536x1024` — **no 2K/4K tier exists for this model** |
+  | `gpt-4o-image` | `1:1` `2:3` `3:2` |
+  | `flux-2-pro`, `flux-2-flex` | `auto` `1:1` `4:3` `3:4` `16:9` `9:16` `3:2` `2:3` |
+  | `flux-kontext-pro`, `flux-kontext-max` | `1:1` `4:3` `3:4` `16:9` `9:16` `21:9` `9:21` |
+  | `seedream-4` | `1:1` `3:4` `4:3` `16:9` `9:16` `3:2` `2:3` `21:9` |
+  | `seedream-4-5` | the `seedream-4` ratios + `2K` / `4K` + custom `WIDTHxHEIGHT` |
+  | `seedream-5-0-lite` | the `seedream-4` ratios + `2K` / `3K` + custom `WIDTHxHEIGHT` |
+  | `seedream-5-pro` | the `seedream-4` ratios (renders 2K) |
+  | `z-image` | `1:1` `4:3` `3:4` `16:9` `9:16` |
+  | `wan-2-7-image`, `wan-2-7-image-pro` | `512x512` `1024x1024` `768x1024` `1024x768` `576x1024` `1024x576` |
+  | `kling-o1-image`, `kling-o3-image` | `16:9` `9:16` `1:1` `4:3` `3:4` `3:2` `2:3` `21:9` (`auto` on `kling-o1-image`) |
 </ParamField>
 
 <ParamField body="quality" type="string">
@@ -1120,7 +1146,27 @@ curl -X POST https://api.gpuniq.com/v1/openai/images/generations \
 </ParamField>
 
 <ParamField body="input_images" type="string[]">
-  Optional reference photos for image-to-image / editing. Each entry is a `data:` URL, `https://` URL, or bare base64 string. Supported by Nano Banana family, GPT Image, FLUX Kontext, Seedream and Nano Banana Pro edit slugs.
+  Optional reference photos for image-to-image / editing. Each entry is a
+  `data:` URL, `https://` URL, or bare base64 string. **Every image model
+  in the catalog accepts them** — passing `input_images` switches the model
+  into its edit mode automatically; you don't pick a separate "edit" slug.
+
+  The number of reference images a model reads differs:
+
+  | Model | Reference images |
+  | --- | --- |
+  | `flux-kontext-pro`, `flux-kontext-max`, `z-image` | 1 |
+  | `wan-2-7-image`, `wan-2-7-image-pro` | up to 4 |
+  | `flux-2-pro`, `flux-2-flex` | up to 8 |
+  | everything else | up to 10 |
+  | `kling-o1-image` | **at least 1 — this model is edit-only** |
+
+  Extras beyond a model's limit are trimmed (the first N are kept). A
+  request the model cannot serve — an edit-only model with no reference
+  image, a prompt over the model's length limit, a reference that is
+  neither a URL nor decodable base64 — comes back as a
+  `UPSTREAM_VALIDATION_ERROR` with a `hint` explaining the fix, instead of
+  quietly rendering something that ignores your input.
 </ParamField>
 
 <Callout kind="info">

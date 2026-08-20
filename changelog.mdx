@@ -7,6 +7,43 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-08-20" description="Reference photos reach every image model; per-model size grammar" tags={["fix", "image"]}>
+
+## Attached photos are no longer ignored
+
+`input_images` now actually reaches the model on every image slug.
+Previously a reference photo could be dropped on the way out — the render
+came back as if you had sent prompt-only, and you were billed for it. The
+models affected were `gpt-4o-image`, `gpt-image-1-5`, `gpt-image-2`,
+`seedream-4`, `seedream-4-5` and the FLUX family. Nothing changes in your
+request shape: keep sending `input_images`, and the model switches into
+edit mode by itself.
+
+Two related changes:
+
+- **Per-model reference-image limits are documented and enforced** —
+  1 for `flux-kontext-pro` / `flux-kontext-max` / `z-image`, 4 for
+  `wan-2-7-image*`, 8 for `flux-2-pro` / `flux-2-flex`, 10 elsewhere.
+  `kling-o1-image` is edit-only and now says so instead of failing
+  obscurely.
+- **Requests a model cannot serve fail loudly.** An edit-only model with
+  no reference image, an over-long prompt, or a reference that is neither
+  a URL nor decodable base64 returns `UPSTREAM_VALIDATION_ERROR` with a
+  `hint`, rather than silently rendering something else.
+
+## `size` follows each model's own shapes
+
+Every image model publishes its own set of output shapes, and they differ
+more than the old docs implied: `gpt-image-1-5` takes three pixel sizes
+(`1024x1024`, `1024x1536`, `1536x1024`) and has no 2K/4K tier at all;
+`gpt-4o-image` takes `1:1` / `2:3` / `3:2`; FLUX Kontext adds `9:21` and
+has no `auto`; `wan-2-7-image` speaks pixel presets. A `size` outside a
+model's own set is now snapped to its closest listed shape instead of
+being passed through and ignored. The full table is in the
+[image parameters](/llm#parameters) section.
+
+</Update>
+
 <Update label="2026-07-23" description="GPT Image 2: true 2K/4K + honoured aspect ratios; typed image-job failures (content_moderation / generation_failed)" tags={["feature", "image", "fix"]}>
 
 ## GPT Image 2 — real 2K/4K output and exact aspect ratios
