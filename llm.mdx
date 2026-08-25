@@ -106,6 +106,9 @@ Image models are billed per returned image, not per token.
 | Seedream 4.5 | `seedream-4-5` | $0.040 | ByteDance Seedream 4.5 |
 | Seedream 5.0 Lite | `seedream-5-0-lite` | $0.035 | ByteDance Seedream 5.0 Lite |
 | Z-Image | `z-image` | $0.020 | Alibaba Z-Image |
+| Midjourney | `mj_imagine` | $0.16 | One call returns the 2×2 grid of four concepts |
+| Midjourney Upscale | `mj_upscale` | $0.10 | Full-size single frame from a grid tile |
+| Midjourney Variation | `mj_variation` | $0.16 | New four-concept grid derived from one tile |
 
 **How `size` picks the GPT Image 2 tier (and the price).** The `size`
 field accepts `WIDTHxHEIGHT` or a bare `1k` / `2k` / `4k`. The tier is
@@ -150,6 +153,59 @@ back wider than 4096px. Expect these dimensions from the 4K tier
 4K renders on this family take noticeably longer than 1K/2K —
 **2–5 minutes is normal**, which is another reason to keep the job
 polling budget at 10 minutes.
+
+#### Midjourney
+
+Midjourney works differently from every other model here, because
+Midjourney itself has no public API: a render is a *job on a real
+Midjourney account*, and the unit of work is a **grid**, not a picture.
+
+**One `mj_imagine` call returns the 2×2 grid** — four takes on your
+prompt in a single image — for $0.16. That is the whole render; there is
+no `n=4` discount to look for, because four concepts is what one job
+produces. Renders take **40–90 seconds**, so use the job API.
+
+To pull one tile out of the grid at full size, follow up with an
+**upscale**. Every delivered Midjourney image carries an `mj_task_id`;
+pass it back with `mj_index` (1–4, reading order — 1 is top-left):
+
+```python
+# 1. The grid
+grid = requests.post(f"{BASE}/v1/llm/images/jobs", headers=H, json={
+    "model": "mj_imagine",
+    "prompt": "an owl librarian in a candlelit archive",
+    "size": "16:9",          # or 1920x1080 — becomes Midjourney's --ar
+}).json()["data"]
+# ... poll GET /v1/llm/images/jobs/{job_id} until status == "completed"
+
+# 2. The single frame you liked, full size
+requests.post(f"{BASE}/v1/llm/images/jobs", headers=H, json={
+    "model": "mj_upscale",
+    "prompt": "",                       # ignored for actions
+    "mj_task_id": done["image"]["mj_task_id"],
+    "mj_index": 2,                      # top-right tile
+})
+```
+
+`mj_variation` takes the same two fields and returns a fresh
+four-concept grid built from the tile you picked — same price as an
+imagine, because it is the same amount of work.
+
+Notes worth knowing before you build on it:
+
+- **`size` is an aspect ratio, not a resolution.** `16:9`, `3:2` and
+  `1920x1080` all work; the ratio is what reaches Midjourney (`--ar`).
+  Output resolution is Midjourney's own.
+- **Midjourney parameters pass through the prompt.** Anything you write
+  as `--stylize 750`, `--chaos 20`, `--niji 6` and so on is honoured;
+  an `--ar` you write yourself wins over `size`.
+- **Reference images work** via `input_images` (https URLs or data URLs).
+- **`mj_task_id` is opaque and route-bound.** Store it as a string and
+  pass it back unchanged; upscales and variations run where the grid
+  lives, so a handle from one render is not valid for another.
+- **A rejected prompt is final.** Midjourney's content filter is
+  Midjourney's own — a `400` comes back immediately rather than being
+  retried elsewhere, so rephrase rather than retrying verbatim.
 
 <Callout kind="warning">
   **Use the job-based API. The synchronous endpoint is legacy.**
