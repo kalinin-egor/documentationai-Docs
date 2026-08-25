@@ -222,6 +222,14 @@ Notes worth knowing before you build on it:
   A held-open request is also the one that loses work: if the client
   disconnects mid-render the image is still generated and still billed,
   but you never receive it. Jobs have no such failure mode.
+
+  The synchronous route has a **300-second budget for the whole provider
+  cascade** — not per provider. When it runs out, the render is abandoned,
+  nothing is charged, and you get `504` with
+  `error_code: "render_timeout"`. Set your own client timeout above 300 s
+  (330 s is a good number) so you read our answer instead of your own
+  `fetch failed`. The job API is not bounded this way: it keeps the full
+  per-provider budgets because there is no connection to lose.
 </Callout>
 
 <Callout kind="warning">
@@ -1223,6 +1231,25 @@ curl -X POST https://api.gpuniq.com/v1/openai/images/generations \
   neither a URL nor decodable base64 — comes back as a
   `UPSTREAM_VALIDATION_ERROR` with a `hint` explaining the fix, instead of
   quietly rendering something that ignores your input.
+
+  **Order is preserved end to end.** The array reaches the upstream in the
+  order you sent it, on every provider that can serve the model. Nothing
+  is reordered, deduplicated or promoted.
+
+  **There is no "start frame" on an image model.** Start / first / last
+  frames exist on the *video* API (`image_url`, `last_frame_url`), where
+  they condition motion. An image model takes one flat list of references
+  and assigns no meaning to position by itself — if reference #1 is the
+  product and #2 is the palette, say so in the prompt ("use the first
+  image for the product shape, the second for the colour palette").
+  Position without a prompt that names it carries no role.
+
+  For convenience the API accepts the spellings other tools use and folds
+  them into `input_images` — arrays `image_input`, `image`, `images`,
+  `image_urls`, `reference_images`, `reference_image_urls`, and scalars
+  `start_frame`, `start_frame_url`, `first_frame_url`, `image_url`,
+  `main_image`. A scalar "main image" becomes **element 0** of the
+  reference array. Sending the same URL under two names delivers it once.
 </ParamField>
 
 <Callout kind="info">
