@@ -770,19 +770,20 @@ field; it is also listed by `GET /v1/llm/models/catalog`).
 |-------|---------|-------|
 | `reference_image_urls` | JPG, PNG, WebP | ≤ 9 images |
 | `video_url` + `video_urls` | any common container (MP4, WebM, MKV, MOV) | ≤ 3 clips, 2–30 s combined, ≤ 50 MB total |
-| `audio_url` + `audio_urls` | MP3, WAV | ≤ 3 tracks |
+| `audio_url` + `audio_urls` | MP3, WAV | ≤ 3 tracks — our cap; the model itself takes 10, ≤ 30 s combined |
 | `image_url`, `last_frame_url` | JPG, PNG, WebP | one image each |
 
 <Callout kind="info">
-  **Why 9 / 3 / 3 and not 30 / 10 / 10.** ByteDance's own 2.5 sheet
-  advertises a larger reference ceiling (up to 30 images, 10 clips and
-  10 audio tracks). The GPUniq request schema is still the shared
-  Seedance 2 one — 9 images, 3 clips, 3 audio tracks — and rejects
-  anything above that with a 400 before dispatch. The longer
-  **reference-clip duration** (30 s combined instead of 15 s) *is*
-  live on 2.5, including in the billing. If you need the wider arrays,
-  tell us — raising the caps is a schema change on our side, not an
-  upstream limitation.
+  **Why 9 / 3 / 3 and not ByteDance's advertised 50.** The "50
+  multimodal references" headline for Seedance 2.5 is a sum: **30
+  images + 10 video clips + 10 audio tracks**, and the model's own API
+  does accept those counts. The GPUniq request schema is still the
+  shared Seedance 2 one — **9 images, 3 clips, 3 audio tracks** — and
+  rejects anything above that with a 400 before dispatch. Two of the
+  2.5 widenings *are* already live here: reference **video** up to 30 s
+  combined (billing included) and reference **audio** up to 30 s. If
+  you need the full arrays, tell us — the caps are ours, not the
+  model's, and raising them is a schema change on our side.
 </Callout>
 
 **Audio generation.** `"audio": true` turns on the model's native
@@ -1013,7 +1014,7 @@ Size and format limits:
 | `image_url`, `last_frame_url` | JPG, PNG, WebP | one image each |
 | `reference_image_urls` | JPG, PNG, WebP | ≤9 Seedance 2 line · ≤4 Kling O3 · ≤3 Veo 3.1 fast/lite |
 | `video_url`, `video_urls` | any common container (MP4, WebM, MKV, MOV) | ≤3 clips, 2–15 s combined (2–30 s on `seedance-2-5`), ≤50 MB total |
-| `audio_url`, `audio_urls` | MP3, WAV | ≤3 tracks, ≤15 s combined |
+| `audio_url`, `audio_urls` | MP3, WAV | ≤3 tracks, ≤15 s combined (≤30 s on `seedance-2-5`) |
 
 Reference **video** resolution and container are unrestricted: 1080p/4K
 and non-MP4 sources are transcoded to ≤720p MP4 on our side before
