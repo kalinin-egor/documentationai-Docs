@@ -7,6 +7,35 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-08-31" description="Seedance 2.5 documented; Seedance 2 per-second rates corrected" tags={["docs", "video"]}>
+
+## Seedance 2.5 is documented
+
+`seedance-2-5` has been in the catalog since 2026-08-10 but only
+`seedance-2` was written up. The [Seedance section](/llm#seedance-bytedance)
+now carries the full contract for it — slug, endpoint, the 4–30 s
+duration range (the longest single-job clip in the Seedance family),
+the 480p/720p-only resolution menu, every reference field with its
+limit, first/last-frame rules, the `audio` flag, per-second pricing in
+both plain and reference mode, and a runnable `curl` example. The
+`seedance-2-fast` and `seedance-2-mini` SKUs are listed too.
+
+Also documented for the first time: **editing and extension are not
+supported** on any Seedance SKU — one request renders one clip. Topaz
+video upscaling is the only post-processing surface.
+
+## Seedance 2 pricing in the docs was stale
+
+The published per-second table still showed the pre-2026-07-28 rates
+($0.33/s at 720p). Actual billing has been −10% off the official
+reference price since then — 720p is **$0.272/s** — and the docs now
+match. Reference-to-video billing is described correctly as well: the
+kickoff estimate assumes the worst-case reference-clip length and the
+final `cost_usd` is recomputed from the measured length, so ref jobs
+with short clips settle below their estimate.
+
+</Update>
+
 <Update label="2026-08-20" description="Reference photos reach every image model; per-model size grammar" tags={["fix", "image"]}>
 
 ## Attached photos are no longer ignored
