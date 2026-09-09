@@ -656,10 +656,13 @@ i2v it supports:
 
 - **First + last frame** — pass `image_url` (start) together with
   `last_frame_url` (end); the clip interpolates between the two frames.
-- **Reference-to-video** — condition the render on up to **3 reference
-  clips** (`video_url` / `video_urls`), up to **9 reference images**
-  (`reference_image_urls`) and up to **3 reference audio tracks**
-  (`audio_url` / `audio_urls`), in any combination. Audio references
+- **Reference-to-video** — condition the render on reference clips
+  (`video_url` / `video_urls`), reference images
+  (`reference_image_urls`) and reference audio tracks
+  (`audio_url` / `audio_urls`), in any combination. The counts are per
+  SKU: `seedance-2`, `-fast` and `-mini` take **9 images, 3 clips and 3
+  audio tracks**, `seedance-2-5` takes **30 images, 10 clips and 10
+  audio tracks**. Audio references
   need at least one image or video reference alongside them (the API
   returns a 400 otherwise). A single `image_url` sent together with any
   reference input is treated as a subject reference rather than a start
@@ -693,7 +696,7 @@ so the render is always random.
 
 Reference-file limits: videos 2–15s combined (up to 30s on
 `seedance-2-5`), ≤50MB total; images JPG/PNG/WebP; audio MP3/WAV, ≤15s
-combined. **Video resolution and container are unrestricted** —
+combined (30s on `seedance-2-5`). **Video resolution and container are unrestricted** —
 1080p/4K clips and non-MP4 formats (webm, MKV, …) are automatically
 converted to ≤720p MP4 on our side before dispatch, so send your source
 footage as-is.
@@ -742,10 +745,10 @@ field; it is also listed by `GET /v1/llm/models/catalog`).
 | `image_url` | string | https URL or `data:` URI — **start frame** (i2v) | — |
 | `last_frame_url` | string | https URL or `data:` URI — **end frame**; requires `image_url` | — |
 | `video_url` | string | one reference clip (https URL or `data:` URI) | — |
-| `video_urls` | array of string | **up to 3** reference clips; merged with `video_url` | — |
-| `reference_image_urls` | array of string | **up to 9** subject/style images (JPG/PNG/WebP) | — |
+| `video_urls` | array of string | **up to 10** reference clips; merged with `video_url` | — |
+| `reference_image_urls` | array of string | **up to 30** subject/style images (JPG/PNG/WebP) | — |
 | `audio_url` | string | one reference audio track (MP3/WAV) | — |
-| `audio_urls` | array of string | **up to 3** reference audio tracks; merged with `audio_url` | — |
+| `audio_urls` | array of string | **up to 10** reference audio tracks; merged with `audio_url` | — |
 | `audio` | bool | `true` makes the model generate the clip's soundtrack | `false` |
 | `seed` | int | accepted by the schema, **has no effect on this SKU** | — |
 | `mode`, `character_orientation` | — | ignored (Kling-family fields) | — |
@@ -768,22 +771,19 @@ field; it is also listed by `GET /v1/llm/models/catalog`).
 
 | Input | Formats | Limit |
 |-------|---------|-------|
-| `reference_image_urls` | JPG, PNG, WebP | ≤ 9 images |
-| `video_url` + `video_urls` | any common container (MP4, WebM, MKV, MOV) | ≤ 3 clips, 2–30 s combined, ≤ 50 MB total |
-| `audio_url` + `audio_urls` | MP3, WAV | ≤ 3 tracks — our cap; the model itself takes 10, ≤ 30 s combined |
+| `reference_image_urls` | JPG, PNG, WebP | ≤ 30 images (`image_url` counts as one of them in reference mode) |
+| `video_url` + `video_urls` | any common container (MP4, WebM, MKV, MOV) | ≤ 10 clips, 2–30 s combined, ≤ 50 MB total |
+| `audio_url` + `audio_urls` | MP3, WAV | ≤ 10 tracks, ≤ 30 s combined |
 | `image_url`, `last_frame_url` | JPG, PNG, WebP | one image each |
 
 <Callout kind="info">
-  **Why 9 / 3 / 3 and not ByteDance's advertised 50.** The "50
-  multimodal references" headline for Seedance 2.5 is a sum: **30
-  images + 10 video clips + 10 audio tracks**, and the model's own API
-  does accept those counts. The GPUniq request schema is still the
-  shared Seedance 2 one — **9 images, 3 clips, 3 audio tracks** — and
-  rejects anything above that with a 400 before dispatch. Two of the
-  2.5 widenings *are* already live here: reference **video** up to 30 s
-  combined (billing included) and reference **audio** up to 30 s. If
-  you need the full arrays, tell us — the caps are ours, not the
-  model's, and raising them is a schema change on our side.
+  **Where the advertised "50 references" go.** The headline for Seedance
+  2.5 is a sum: **30 images + 10 video clips + 10 audio tracks**, and all
+  three are accepted here as of 2026-09-09. The counts are per SKU, not
+  per family — the `seedance-2`, `-fast` and `-mini` lines take
+  **9 / 3 / 3**, which is their own model's ceiling, and an over-cap
+  array on either line is a 400 naming the field rather than a silent
+  trim upstream.
 </Callout>
 
 **Audio generation.** `"audio": true` turns on the model's native
@@ -792,12 +792,39 @@ soundtrack generation for the rendered clip. It is independent of
 lip-sync anchors), not output settings. The flag is always sent
 explicitly upstream, so omitting it reliably yields a silent clip.
 
-**Editing / extension.** Not supported. GPUniq exposes no video-editing,
-extend, continue or re-cut endpoint for any Seedance SKU — a job renders
-one clip from one request. The adjacent post-processing surface is Topaz
-video upscaling (`POST /v1/llm/topaz/video/jobs`, see
-[Topaz](/llm/topaz)); to continue a scene, feed the last frame of your
-clip back in as `image_url` on a new job.
+**Editing / extension.** Supported on this SKU via `video_task`. Attach
+the clip you want to work on as `video_url` (or `video_urls`), address it
+in the prompt as `@Video 1`, and set:
+
+| `video_task` | What it does | `duration` |
+|--------------|--------------|------------|
+| `edit` | Rewrites the source in place — relight, remove or replace an element, restyle. Always returns a clip the **same length** as its source (within ~0.4 s). | must be **omitted** |
+| `extend` | Renders **new** footage continuing the source. Say the direction in the prompt (`Extend @Video 1 forward` / `backward`). | seconds to add, 4–30; omit to let the model choose |
+
+Both modes inherit the source's aspect ratio, so `aspect_ratio` is
+ignored, and both are mutually exclusive with `image_url` /
+`last_frame_url` — there is no start frame to set when the input is a
+whole clip. Scope an edit with plain language (`Keep the storefront,
+lighting and camera move exactly unchanged`); an edit aims at continuity,
+not pixel-identical preservation of the untouched regions.
+
+<Callout kind="warning">
+  **Only `seedance-2-5`.** Every other Seedance SKU renders one clip from
+  one request; `video_task` on them returns a 400 rather than quietly
+  generating something new. Edit/extend jobs are also pinned to the one
+  upstream that implements the mode, so they don't participate in the
+  usual provider failover.
+</Callout>
+
+**Cost.** Billed exactly like reference-to-video: `(source seconds +
+output seconds) × the reference rate` for your resolution. A 10 s source
+edited at 480p bills 20 s; the same source extended by 4 s bills 14 s.
+Because an edit's output length isn't knowable at submit, the kickoff
+`estimated_cost_usd` assumes the source's measured length and the final
+`cost_usd` is recomputed from the upstream invoice.
+
+The adjacent post-processing surface is Topaz video upscaling
+(`POST /v1/llm/topaz/video/jobs`, see [Topaz](/llm/topaz)).
 
 **Cost**
 
