@@ -947,7 +947,7 @@ while time.time() < deadline:
 | `image_url` | string | no | https URL or data URI — enables image-to-video (start frame). |
 | `last_frame_url` | string | no | https URL or data URI — end frame for first/last-frame interpolation. Supported on Kling 2.1-Pro / 2.6 / 3.0 / O3, Veo 3.1 (all tiers) and the whole Seedance 2 line (`seedance-2`, `seedance-2-5`, `-fast`, `-mini`). Requires `image_url`. The first image is always the FIRST frame, the second the LAST — order matters. |
 | `video_url` | string | no | https URL or `data:` URI — reference clip for motion-control v2v variants and Seedance 2 line reference-to-video. Links the host serves as a non-video `Content-Type` are re-hosted automatically. |
-| `video_urls` | array | no | Up to 3 https URLs or `data:` URIs — multiple reference clips for reference-to-video (Seedance 2 line). Single-reference models use the first entry. |
+| `video_urls` | array | no | Reference clips for reference-to-video (Seedance 2 line) — https URLs or `data:` URIs, up to 3 on `seedance-2` / `-fast` / `-mini` and up to 10 on `seedance-2-5`. A `data:` URI or a share link that serves the file as `application/octet-stream` is re-hosted as `video/mp4` before dispatch. Single-reference models use the first entry. |
 | `reference_image_urls` | array | no | Seedance 2 line, Kling O3 and Veo 3.1 fast/lite — up to 9 https URLs / data URIs of subject or style reference images (JPG/PNG/WebP) on Seedance. Switches the job to reference-to-video mode. |
 | `audio_url` | string | no | Seedance 2 line only — reference audio track (MP3/WAV). Requires at least one image or video reference in the same request. |
 | `audio_urls` | array | no | Seedance 2 line only — up to 3 reference audio tracks, ≤15s combined; merged with `audio_url`. |
