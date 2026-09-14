@@ -7,6 +7,31 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-09-14" description="Motion Control fallback fixed; failed video jobs say why" tags={["fix", "video"]}>
+
+## Kling Motion Control: the fallback route works again
+
+When the first two routes for `kling-2-6-motion-control` /
+`kling-3-0-motion-control` failed, the last one refused every job on a
+field our side forgot to send. The job then ended with
+`"All providers failed: inner status 500: This field is required"`.
+That was never your request: the poll itself was HTTP 200, and
+`character_orientation` is optional (default `video`). The route is
+fixed, and `character_orientation` is now listed in the
+[request body table](/llm#request-body). Failed jobs were never
+charged.
+
+## Failed video jobs carry `error_code` and the useful reason
+
+A failed video job used to report whatever error the last route gave.
+Now it reports the most useful one. If any model refused your input
+(picture size, several people in a motion clip, a file served with the
+wrong type), you get that reason with `error_code: "input_rejected"`.
+Otherwise `generation_failed`. See
+[video job failure causes](/llm/errors#video-jobs-typed-failure-causes).
+
+</Update>
+
 <Update label="2026-08-31" description="Seedance 2.5 documented; Seedance 2 per-second rates corrected" tags={["docs", "video"]}>
 
 ## Seedance 2.5 is documented

@@ -1003,6 +1003,7 @@ while time.time() < deadline:
 | `resolution` | string | no | Seedance 2: `480p` / `720p` (default) / `1080p` / `4k`, priced per second per resolution. `seedance-2-5` / `-fast` / `-mini`: `480p` / `720p` (default) **only**. Kling 3.0 / O3: `720p` / `1080p` (default) / `4k`. Kling 2.6 / 3.0 **Motion Control**: `720p` / `1080p` (default). Veo 3.1: `720p` / `1080p` / `4k`. Kling 2.1 / 2.5 Turbo Pro: `1080p` only. **Default is `1080p` for every Kling/Veo SKU when the field is omitted** — the Seedance 2 line is the exception at `720p`. |
 | `audio` | bool | no | Default `false`. Kling 2.6 / 3.0 double the price when `true`; on the Seedance 2 line it generates the clip's audio track (no surcharge). |
 | `mode` | string | no | `standard` / `pro` (default) / `master` for Kling 2.1; `turbo` for 2.5 Turbo Pro. |
+| `character_orientation` | string | no | Kling 2.6 / 3.0 **Motion Control** only. `video` (default) — the output follows the reference clip's framing, clip up to 30s; `image` — the output follows the character image, clip up to 10s. Other models ignore it. |
 | `seed` | int | no | `seedance-2` only — integer in `[-1, 4294967295]`; omit or pass `-1` for a random seed. Reusing a seed with an otherwise identical request pulls the render toward the earlier one; it does **not** reproduce it frame for frame. Accepted but inert on `seedance-2-5` / `-fast` / `-mini`; other models ignore the field. |
 
 <Callout kind="info">

@@ -263,8 +263,36 @@ Two timing facts worth wiring into your client:
   charged until an image is actually delivered to a poll, so an abandoned job costs nothing but the
   wait.
 
-Failed jobs are billed **nothing**, regardless of the cause. Video and music job failures currently
-carry only the human-readable `error` string; typed causes will arrive there in the same shape.
+Failed jobs are billed **nothing**, regardless of the cause. Music job failures currently carry only
+the human-readable `error` string.
+
+### Video jobs: typed failure causes
+
+Failed **video** jobs (`GET /v1/llm/videos/jobs/{job_id}`) carry `error_code` as well. The poll is
+still HTTP 200 with `status: "failed"`: the kickoff was valid and was accepted (fields you sent
+that we can check up front are rejected at kickoff as a `400 invalid_request` naming the field),
+and the render then failed on every route. A failed job is never charged.
+
+| `error_code` | Meaning | What to do |
+|---|---|---|
+| `input_rejected` | A model refused the input media itself: picture size or aspect, several people in a motion-control clip, a file served with the wrong type. `error` carries the model's own reason. | Fix the input named in `error`. Retrying the same request verbatim fails again. |
+| `content_moderation` | Two independent upstreams refused the prompt and/or references on content policy. | Edit the prompt or references. |
+| `invalid_request` | The model classified the request differently from its fields (e.g. Seedance reading the prompt as an edit of the attached clip). `error` says which change works. | Apply the change from `error`. |
+| `generation_failed` | Every route failed for reasons unrelated to your input. | Re-kick off the job; backoff with a 30-second ceiling is enough. |
+
+```jsonc
+// GET /v1/llm/videos/jobs/{job_id} — input refused (HTTP 200)
+{
+  "exception": 0,
+  "data": {
+    "status": "failed",
+    "job_id": "vid_…",
+    "error": "All providers failed: The picture size is non-compliant or the video contains multiple people",
+    "error_code": "input_rejected"
+  },
+  "message": "Статус задачи"
+}
+```
 
 ### Video-generation specific recipes
 
