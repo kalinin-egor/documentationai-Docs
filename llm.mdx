@@ -786,6 +786,34 @@ field; it is also listed by `GET /v1/llm/models/catalog`).
   trim upstream.
 </Callout>
 
+**Field names, and how to tell an input arrived.** The model's own
+passport spells the reference arrays `reference_video_urls` /
+`reference_image_urls` / `reference_audio_urls`, and the start frame
+`first_frame_url`. Those spellings are accepted here and folded onto the
+names in the table above (so are their camelCase forms, `reference_videos`,
+`end_frame_url`, `source_video_url` and `duration_seconds`). A field name
+we don't recognise that looks like an attachment — `motion_clip`,
+`image_urls`, a typo of a real one — is a **400 naming it**, never a
+render that quietly ignored it.
+
+Every kickoff answers the question directly in `data.inputs`:
+
+```json
+"inputs": {
+  "mode": "reference-to-video",
+  "reference_videos": 1,
+  "reference_images": 2,
+  "reference_audio": 0,
+  "start_frame": false,
+  "end_frame": false,
+  "notes": ["`image_url` ships as reference image #1 — address it as @Image1 in the prompt."]
+}
+```
+
+`"reference_videos": 0` on a job built around a reference clip means the
+clip never reached the model — check that on the first call of a new
+integration rather than after a batch of renders.
+
 **Audio generation.** `"audio": true` turns on the model's native
 soundtrack generation for the rendered clip. It is independent of
 `audio_url` / `audio_urls`, which are *input* references (pacing /
@@ -871,7 +899,10 @@ curl -X POST https://api.gpuniq.com/v1/llm/videos/jobs \
   }'
 
 # → {"exception":0,"data":{"job_id":"vid_e93e98c7ca5e4982876b",
-#                          "status":"pending","estimated_cost_usd":9.69,...}}
+#                          "status":"pending","estimated_cost_usd":9.69,
+#                          "inputs":{"mode":"reference-to-video",
+#                                    "reference_videos":1,"reference_images":2,
+#                                    "reference_audio":0,...},...}}
 
 # 2. Poll every 3–5 s until status is completed or failed
 curl https://api.gpuniq.com/v1/llm/videos/jobs/vid_e93e98c7ca5e4982876b \
@@ -955,6 +986,18 @@ while time.time() < deadline:
 | `audio` | bool | no | Default `false`. Kling 2.6 / 3.0 double the price when `true`; on the Seedance 2 line it generates the clip's audio track (no surcharge). |
 | `mode` | string | no | `standard` / `pro` (default) / `master` for Kling 2.1; `turbo` for 2.5 Turbo Pro. |
 | `seed` | int | no | `seedance-2` only — integer in `[-1, 4294967295]`; omit or pass `-1` for a random seed. Reusing a seed with an otherwise identical request pulls the render toward the earlier one; it does **not** reproduce it frame for frame. Accepted but inert on `seedance-2-5` / `-fast` / `-mini`; other models ignore the field. |
+
+<Callout kind="info">
+  **Vendor spellings are accepted, unknown ones are refused.** The media
+  fields also answer to the names the model vendors use —
+  `reference_video_urls`, `reference_videos`, `reference_audio_urls`,
+  `first_frame_url`, `end_frame_url`, `source_video_url`,
+  `duration_seconds`, and the camelCase of any field above. A field name
+  we don't recognise that looks like an attachment is a **400 naming
+  it**: an input that silently fails to attach costs you a render, so we
+  refuse the request instead. Each kickoff also returns `data.inputs` —
+  the mode and the count of references that reached the model.
+</Callout>
 
 ##### Duration by model
 
