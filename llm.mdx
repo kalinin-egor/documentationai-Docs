@@ -767,6 +767,24 @@ field; it is also listed by `GET /v1/llm/models/catalog`).
    **not applied**. Audio references require at least one image or video
    reference alongside them, otherwise the API returns a 400.
 
+<Callout kind="warning">
+  **Write the prompt as a shot, not as an instruction about the clip.**
+  Seedance reads the prompt to decide what kind of job it was handed. A
+  prompt that tells the model what to do with the attached clip —
+  *"follow @Video 1 exactly"*, *"extend this shot"* — is classified as
+  video **editing**, and an edit's length and aspect ratio follow the
+  source, which makes the `duration` / `aspect_ratio` in your request
+  invalid. The job then fails with a message saying so.
+
+  Measured 2026-09-14 on one clip and one request shape, varying only
+  the prompt: the instructing version failed four times out of four,
+  while *"a calm wide shot, cinematic"* on the same reference rendered.
+  So describe the **shot you want** — the reference still drives the
+  performance, motion and look — or, when you really do want to work on
+  the attached clip, use [`video_task`](#editing--extension) and omit
+  `duration`.
+</Callout>
+
 **Reference-media limits on this SKU**
 
 | Input | Formats | Limit |
