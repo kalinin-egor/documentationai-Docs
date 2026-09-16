@@ -7,6 +7,44 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-09-16" description="Video: pick the container and encoder quality; bitrate questions answered" tags={["feature", "video"]}>
+
+## `output_format` and `output_quality` on video jobs
+
+`POST /v1/llm/videos/jobs` takes two new optional fields. `output_format`
+picks the container of the delivered file — `mp4` (default), `mov` or
+`webm`. `output_quality` sets the encoder quality, `20`–`99` (upstream
+default `95`). Both are listed in the
+[request body table](/llm#request-body) with the models that honour
+them: the Seedance 2 line and Kling 3.0 / O3 / 2.6 / 2.5 Turbo Pro;
+`seedance-2-5` also serves `mov` on its second route.
+
+The rule is the same as for reference inputs: a job is only routed to a
+provider that can encode what you asked for. Asking for `webm` on a
+model whose routes only produce MP4 is a **400 before the job starts**,
+naming the containers that model can deliver — never a silently
+re-encoded default you pay for. The kickoff receipt echoes the container
+in `inputs.output_format`.
+
+## About bitrate
+
+Several of you asked whether a low bitrate explains pixelated frames.
+No provider we route to lets a caller pin a bitrate or a codec, so
+`bitrate`, `bitrate_mode` and `codec` are now refused with a hint
+instead of being ignored. The encoder default (`95`) is already at the
+top of the visually lossless range: if the downloaded file still looks
+pixelated at 100 % on a paused frame, the detail was never rendered —
+raise `resolution` (`1080p` / `4k` where the model offers it) rather
+than the encode setting.
+
+## Delivered files keep their container
+
+A `mov` or `webm` delivery is stored and served under its own extension
+and MIME type instead of `.mp4` / `video/mp4`; MP4 deliveries are
+unchanged.
+
+</Update>
+
 <Update label="2026-09-14" description="Motion Control fallback fixed; failed video jobs say why" tags={["fix", "video"]}>
 
 ## Kling Motion Control: the fallback route works again
