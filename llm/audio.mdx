@@ -13,21 +13,32 @@ kickoff-then-poll contract:
 
 Both return a `job_id` in under a second, charge only when a poll returns the
 finished media, and cost nothing on a failure. Auth is `X-API-Key: gpuniq_...`
-(a JWT works too) on every call.
+(`Authorization: Bearer gpuniq_...` and a dashboard JWT work too).
+
+<Callout kind="warning">
+  **Check `exception`, not the HTTP status.** A refused kickoff — unknown
+  model, insufficient balance, a missing required field — comes back as
+  **HTTP 200** with a non-zero `exception` and the reason in
+  `data.error_code`. Only a malformed body (wrong type, over a length limit)
+  is a real HTTP 400. `resp.raise_for_status()` catches neither the first
+  kind nor a failed job, so branch on `body["exception"] != 0`.
+</Callout>
 
 ## Music
 
-One call buys one generation. The models behind `music-v5`, `music-v5-5` and
-`music-v4-5` return **two tracks per call** and are billed once for the call,
-not per track — you get an A/B pair for the price of one render.
+One call buys one generation and is **billed once, however many tracks come
+back**. `music-v5`, `music-v5-5`, `music-v4-5` and `generate-music` return
+**two tracks per call** — an A/B pair for the price of one render.
 
-| Slug | Price / call | Tracks | Notes |
-|------|--------------|--------|-------|
-| `music-v5` | $0.12 | 2 | Latest stable line — the sensible default |
-| `music-v5-5` | $0.12 | 2 | Newest, experimental |
-| `music-v4-5` | $0.12 | 2 | Previous generation, faster time-to-first-track |
-| `generate-music` | $0.20 | 1 | Legacy slug, text-to-music with style + lyrics |
-| `minimax-music-2-6` | $0.20 | 1 | MiniMax Music 2.6 |
+| Slug | Price / call | Notes |
+|------|--------------|-------|
+| `music-v5` | $0.12 | Latest stable line — the sensible default |
+| `music-v5-5` | $0.12 | Newest, experimental |
+| `music-v4-5` | $0.12 | Previous generation, faster time-to-first-track |
+| `generate-music` | $0.20 | Legacy slug; needs `style` + `title` for vocal tracks |
+| `minimax-music-2-6` | $0.20 | MiniMax Music 2.6; needs `style` + `title` for vocal tracks |
+
+Extending an existing track is not available through the API yet.
 
 ### Two prompt modes
 
@@ -57,7 +68,7 @@ The fields you send decide how much freedom the model gets:
 | `instrumental` | bool | no | `true` for a track with no vocals. Default `false`. |
 | `lyrics` | string | no | Up to 5000 characters. Sets custom mode; the model sings these words. |
 | `model_version` | string | no | `V4` / `V4_5` / `V4_5PLUS` / `V4_5ALL` / `V5` / `V5_5`. Default `V5`. Read by the legacy slugs; the `music-v*` slugs carry their version in the slug itself. |
-| `style_weight` | float | no | `0.0`–`1.0`, two decimals — how strictly the style is followed. |
+| `style_weight` | float | no | `0.0`–`1.0`, two decimals — how strictly the style is followed. **Legacy slugs only**; accepted and ignored on `music-v*`. |
 
 ### Example
 
@@ -67,14 +78,17 @@ import time, requests
 BASE = "https://api.gpuniq.com/v1/llm"
 HEADERS = {"X-API-Key": "gpuniq_your_key"}
 
-start = requests.post(f"{BASE}/music/jobs", headers=HEADERS, json={
+body = requests.post(f"{BASE}/music/jobs", headers=HEADERS, json={
     "model": "music-v5",
     "prompt": "a slow synthwave track for a night drive through empty streets",
     "style": "Synthwave, analog pads, 90 BPM",
     "title": "Night Drive",
     "instrumental": True,
-}).json()["data"]
+}).json()
+if body["exception"] != 0:              # refusals arrive as HTTP 200
+    raise RuntimeError(body["data"]["error_code"])
 
+start = body["data"]
 job_id = start["job_id"]
 print("estimated:", start["estimated_cost_usd"])   # 0.12
 
@@ -93,17 +107,19 @@ while time.time() < deadline:
 ```
 
 <Callout kind="warning">
-  **Give the poll loop a 10-minute budget.** Music generation is slower than
-  image generation — a full vocal track routinely takes several minutes, and
-  abandoning the loop early costs you a render you would otherwise have
-  received. The job id lives in the job store for 60 minutes.
+  **Give the poll loop a generous budget.** Music renders are slower than
+  image renders, and abandoning the loop early costs you a render you would
+  otherwise have received. The job record lives for **60 minutes**; after that
+  a poll returns `job_not_found`.
 </Callout>
 
 ## Speech, dialogue, sound effects & isolation
 
 One endpoint, four kinds of work. The `model` slug decides which fields are
-required, and sending the wrong ones is a `400` naming the missing field
-rather than a job that fails minutes later.
+read. A **missing required field** is refused at kickoff with
+`invalid_request` naming it. A field the SKU does not use is **silently
+dropped**, not refused — so check the table below rather than assuming a knob
+took effect.
 
 | Slug | What it does | Billed | Rate |
 |------|--------------|--------|------|
@@ -117,23 +133,23 @@ rather than a job that fails minutes later.
 
 | Kind | Required | Optional |
 |------|----------|----------|
-| TTS (`elevenlabs-tts-*`) | `text` | `voice`, `stability`, `similarity_boost`, `style`, `speed`, `language_code`, `output_format` |
-| Dialogue (`elevenlabs-v3-dialogue`) | `dialogue` — a list of `{text, voice}` turns | `output_format` |
+| TTS (`elevenlabs-tts-*`) | `text` | `voice`, `stability`, `similarity_boost`, `style`, `speed`, `language_code` |
+| Dialogue (`elevenlabs-v3-dialogue`) | `dialogue` — a list of `{text, voice}` turns | `stability`, `language_code` |
 | Sound effect (`elevenlabs-sound-effect-v2`) | `text` | `duration_seconds`, `prompt_influence`, `loop`, `output_format` |
-| Isolation (`elevenlabs-audio-isolation`) | `audio_url` | `output_format` |
+| Isolation (`elevenlabs-audio-isolation`) | `audio_url` | — |
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `text` | string | ≤ **5000 characters**. Over the limit is a 400 naming the count, never a truncated read. |
+| `text` | string | ≤ **5000 characters**. Longer is an HTTP 400 `invalid_request` with the limit in `data.meta.fields` — never a truncated read. |
 | `voice` | string | ElevenLabs voice id. Omit for a stock voice. |
 | `stability`, `similarity_boost`, `style` | float | `0.0`–`1.0` prosody controls. |
 | `speed` | float | `0.7`–`1.2`. |
 | `language_code` | string | ISO 639-1, to force a language the text is ambiguous about. |
-| `dialogue` | array | `{text, voice}` per speaker turn. The 5000-character cap applies to the **sum** of all turns. |
+| `dialogue` | array | `{text, voice}` per speaker turn. The 5000-character cap applies to the **sum** of all turns and is refused with the count. Every turn needs a non-empty `text` and `voice`. |
 | `duration_seconds` | float | Sound effect length hint, up to **30 s**. |
 | `prompt_influence` | float | `0.0`–`1.0` — how literally the effect follows the prompt. |
 | `loop` | bool | Generate a seamless loop. |
-| `output_format` | string | e.g. `mp3_44100_128`. |
+| `output_format` | string | e.g. `mp3_44100_128`. **Sound effects only** — the other audio SKUs drop it. |
 | `audio_url` | string | Source file for isolation. |
 
 ### Example: text-to-speech
@@ -144,13 +160,15 @@ import time, requests
 BASE = "https://api.gpuniq.com/v1/llm"
 HEADERS = {"X-API-Key": "gpuniq_your_key"}
 
-start = requests.post(f"{BASE}/audio/jobs", headers=HEADERS, json={
+body = requests.post(f"{BASE}/audio/jobs", headers=HEADERS, json={
     "model": "elevenlabs-tts-turbo-2-5",
     "text": "Your instance is ready. SSH credentials are in the dashboard.",
     "speed": 1.0,
-}).json()["data"]
+}).json()
+if body["exception"] != 0:              # refusals arrive as HTTP 200
+    raise RuntimeError(body["data"]["error_code"])
 
-job_id = start["job_id"]
+job_id = body["data"]["job_id"]
 
 deadline = time.time() + 300
 while time.time() < deadline:
@@ -193,16 +211,17 @@ that turns out shorter settles well under its estimate.
 
 ## Where the delivered media lives
 
-Music tracks and audio files follow the same rules as images and video: the
-completion response carries the upstream URL, and a GPUniq-hosted copy is kept
-for **7 days**. Treat that copy as a delivery buffer, not an archive —
-download the bytes to your own storage if you need them to persist. See
-[Where delivered media lives](/llm/video#where-delivered-media-lives).
+Unlike images and video, **music tracks and audio files are not mirrored to
+GPUniq storage**. The completion response carries only the upstream URL, whose
+lifetime is set by the rendering provider, not by us — and the job record
+itself expires after 60 minutes. Download the bytes as soon as the job
+completes.
 
 ## Errors
 
 Both surfaces use the same typed error codes as the video job API —
 `insufficient_balance`, `model_not_found`, `invalid_request`,
 `content_moderation`, `upstream_validation_error`, `provider_unavailable`,
-and `job_not_found` (404) for an unknown, expired or foreign-owned job id.
+and `job_not_found` (`exception: 404`, still HTTP 200) for an unknown, expired
+or foreign-owned job id.
 Full catalog and recovery recipes: [Error reference](/llm/errors).

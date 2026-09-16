@@ -1,6 +1,6 @@
 ---
 title: Models & pricing
-description: 370+ models across 13 vendors on one balance — how each media kind is billed, how discounts apply, and how to read the live catalog instead of a table that goes stale.
+description: 370+ models on one balance — how each media kind is billed, how discounts apply, and how to read the live catalog instead of a table that goes stale.
 ---
 
 GPUniq serves **370+ models** — text, image, video, music, speech and
@@ -71,7 +71,7 @@ used when a chat request omits `model`.
 
 ## Text & reasoning models
 
-Thirteen vendor families. Exact slugs and prices come from the catalog; this
+The main vendor families. Exact slugs and prices come from the catalog; this
 is the map of what's on the shelf.
 
 | Vendor | Lines available | Best for |
@@ -85,7 +85,8 @@ is the map of what's on the shelf.
 | **Zhipu** | GLM-5.2, 5.1, 5, 4.7 (+ Flash / Thinking), GLM-4V, GLM-OCR | Multilingual, OCR, low cost |
 | **Moonshot** | Kimi K2.7 Code, K2.6, K2.5, K2 (+ Thinking), Moonshot v1 | Long context, agentic coding |
 | **ByteDance** | Doubao Seed 1.6 (+ Thinking / Flash / Lite), Doubao 1.5 Pro | Chinese-first workloads |
-| **MiniMax** | M3, M2.7, M2.5, M2.1, M2; MiMo v2.5 | Balanced cost, multilingual |
+| **MiniMax** | M3, M2.7, M2.5, M2.1, M2 | Balanced cost, multilingual |
+| **Xiaomi** | MiMo v2.5 / v2.5 Pro | Low-cost reasoning |
 
 Filter the catalog by `category` to narrow it — `flagship` for the top of each
 line, `fast` for the cheap high-throughput tier.
@@ -120,10 +121,12 @@ your key already reflects your price.
 
 ### The open-weight tier
 
-Open-weight models — `deepseek-v4-pro`, `deepseek-v4-flash`, `gpt-oss-120b`
-and the Qwen / GLM / Kimi lines — are not priced from a fixed catalog number.
-They are priced from the *cheapest live rate available for those weights*,
-plus our margin, and that moves as the market moves.
+Open-weight models — among them `deepseek-v4-pro`, `deepseek-v4-flash`,
+`deepseek-v3.2`, `gpt-oss-120b`, GLM-5.x, Kimi K2.x, MiniMax M3 and Gemma — are
+not priced from a fixed catalog number. They are priced from the *cheapest live
+rate available for those weights*, plus our margin, and that moves as the
+market moves. Proprietary lines such as Qwen Plus / Max / Flash are not in this
+tier and carry a fixed catalog price.
 
 This is why no number for them is printed here: anything published would be
 stale within days. Read the live figure from the catalog or the model card in

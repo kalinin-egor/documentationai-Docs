@@ -134,8 +134,8 @@ curl -X POST https://api.gpuniq.com/v1/llm/chats/42/share \
 |----------|--------------|
 | `GET /v1/llm/chats/{chat_id}/messages` | Page through a session's messages. |
 | `DELETE /v1/llm/chats/{chat_id}/messages/{message_id}` | Remove one message from the history. |
-| `GET /v1/llm/chats/{chat_id}/context` | The context the model will actually see on the next turn — useful when a long session starts getting trimmed. |
-| `POST /v1/llm/chats/{chat_id}/turns` | Append a turn without generating a reply. |
+| `GET /v1/llm/chats/{chat_id}/context` | The messages the next turn will be sent with. Pass `?model=` to see the history as trimmed for that model's context window. |
+| `POST /v1/llm/chats/{chat_id}/turns` | Record a turn you already generated and paid for on a streaming surface, so it lands in the session history. Never charges. |
 
 ### Generating images inside a session
 
@@ -166,16 +166,45 @@ curl "https://api.gpuniq.com/v1/llm/generations?kind=video&limit=20" \
 
 ## Generate terminal commands
 
-Convert natural language to a ranked list of shell commands with danger annotations:
+`POST /v1/llm/generate-commands` turns a natural-language task into an ordered
+list of shell commands, each annotated with a `danger_level`. The Python SDK has
+no helper for this endpoint — call it over HTTP.
 
-```python
-cmds = client.llm.generate_commands(
-    prompt="find all Python files larger than 1MB and sort by size",
-    max_commands=5,
-)
-for c in cmds["commands"]:
-    print(f"[{c['danger']}] {c['command']}  # {c['description']}")
+| Field | Type | Notes |
+|-------|------|-------|
+| `prompt` | string | Required, 1–1000 characters. |
+| `max_commands` | int | 1–10, default 5. |
+| `model` | string | Optional; the server default is used when omitted. |
+| `context` | object | Optional — OS, shell history, environment. |
+
+```python Python
+import requests
+
+body = requests.post(
+    "https://api.gpuniq.com/v1/llm/generate-commands",
+    headers={"X-API-Key": "gpuniq_your_key"},
+    json={"prompt": "find all Python files larger than 1MB and sort by size",
+          "max_commands": 5},
+).json()
+if body["exception"] != 0:              # refusals arrive as HTTP 200
+    raise RuntimeError(body["data"])
+
+for c in body["data"]["commands"]:
+    print(f"[{c['danger_level']}] {c['command']}  # {c['description']}")
 ```
+
+The response also carries `explanation`, `warnings`, `alternatives`,
+`tokens_used`, `cost_usd` and `balance_usd`. Per-command fields beyond
+`command`, `description` and `danger_level` (`step`, `requires_confirmation`,
+`expected_output`) are written by the model and may be missing. If the model's
+reply cannot be parsed, `commands` comes back **empty** with the reason in
+`explanation` — treat an empty list as a result to handle, not as success.
+
+<Callout kind="warning">
+  This endpoint predates the shared error catalog: its `error_code` values are
+  **upper-case** (`INSUFFICIENT_BALANCE`), unlike the lower-case codes on every
+  other surface. Compare case-insensitively if you branch on them.
+</Callout>
 
 ## Errors
 

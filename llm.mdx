@@ -3,8 +3,8 @@ title: LLM & Media API
 description: Chat, reasoning, images, video, music, speech and upscaling through one API key and one USD balance. Claude, GPT, Gemini, Grok, DeepSeek, Qwen, Nano Banana, Seedance, Veo and more.
 ---
 
-One API key, one balance, one usage log — **370+ models** from 13 vendors,
-covering text, images, video, music, speech and restoration.
+One API key, one balance, one usage log — **370+ models** covering text,
+images, video, music, speech and restoration.
 
 There are two ways in:
 
@@ -136,7 +136,7 @@ full streaming / job-based / reasoning-token recipe.
 
 ## Errors
 
-Every failure returns a stable OpenAI error envelope with a structured `code` you can branch on — `streaming_required`, `insufficient_balance`, `model_not_found`, `rate_limit_per_key`, etc. See the [Error reference](/llm/errors) for the complete catalog (29 codes), recovery strategies, and the native vs. OpenAI-compat envelope shapes.
+Every failure returns a stable OpenAI error envelope with a structured `code` you can branch on — `streaming_required`, `insufficient_balance`, `model_not_found`, `rate_limit_per_key`, etc. See the [Error reference](/llm/errors) for the complete catalog, recovery strategies, and the native vs. OpenAI-compat envelope shapes.
 
 ```jsonc
 {
@@ -154,8 +154,9 @@ Every failure returns a stable OpenAI error envelope with a structured `code` yo
 
 ## Where delivered media lives
 
-Every generated image, video and audio file is mirrored to GPUniq storage and
-the response carries both the upstream URL and a GPUniq-hosted copy, kept for
-**7 days**. That copy is a delivery buffer, not an archive — download the bytes
-if you need them to last. Details:
+Generated images and videos are mirrored to GPUniq storage: the response
+carries both the upstream URL and a GPUniq-hosted copy, kept for **7 days**.
+That copy is a delivery buffer, not an archive — download the bytes if you need
+them to last. **Music and audio are not mirrored**; download those as soon as
+the job completes. Details:
 [Where delivered media lives](/llm/video#where-delivered-media-lives).
