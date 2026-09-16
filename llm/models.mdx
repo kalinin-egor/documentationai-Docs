@@ -1,0 +1,188 @@
+---
+title: Models & pricing
+description: 370+ models across 13 vendors on one balance — how each media kind is billed, how discounts apply, and how to read the live catalog instead of a table that goes stale.
+---
+
+GPUniq serves **370+ models** — text, image, video, music, speech and
+restoration — behind one API key and one USD balance. The catalog changes
+weekly, so this page documents the *rules*. For the numbers, ask the API:
+
+<CodeGroup>
+```bash cURL
+curl https://api.gpuniq.com/v1/llm/models/catalog
+```
+
+```python Python SDK
+models = client.llm.models()
+for model in models["models"]:
+    print(model["slug"], model["retail_input_usd_per_mtok"])
+```
+
+```bash OpenAI-compatible
+curl https://api.gpuniq.com/v1/openai/models \
+  -H "Authorization: Bearer gpuniq_your_key"
+```
+</CodeGroup>
+
+`GET /v1/llm/models/catalog` is public and needs no key. It is the only
+authoritative price list — the model cards in [/chat](https://gpuniq.com/chat)
+read from it too.
+
+<Callout kind="info">
+  **This page no longer prints per-token price tables.** They went stale
+  faster than anyone could maintain them: model prices move with the
+  wholesale market, sometimes weekly. Media prices (per image, per clip, per
+  second) are stable enough to publish and live on the
+  [image](/llm/images#models-pricing), [video](/llm/video#models-pricing)
+  and [music & speech](/llm/audio) pages.
+</Callout>
+
+## What the catalog returns
+
+One entry per model. The fields that matter when you are choosing or
+budgeting:
+
+| Field | What it tells you |
+|-------|-------------------|
+| `slug` | The string you put in `model`. |
+| `label`, `description` | Human-readable name and one-line summary. |
+| `provider` | Vendor family — `anthropic`, `openai`, `google`, `xai`, `deepseek`, `qwen`, `zhipu`, `moonshot`, `bytedance`, `minimax`, … |
+| `category` | `flagship` / `reasoning` / `balanced` / `fast` — the shelf it sits on. |
+| `media_kind` | `text`, `image`, `video`, `music` or `audio`. Decides which endpoint serves it. |
+| `retail_input_usd_per_mtok`, `retail_output_usd_per_mtok` | Text pricing, USD per million tokens, input and output priced separately. |
+| `retail_usd_per_image` | Flat price per delivered image. |
+| `retail_usd_per_unit` + `video_billing_unit` / `audio_billing_unit` | Media price and the unit it is charged in — `video`, `second` or `character`. |
+| `discounted`, `discount_percent_label` | Whether this model is sold below vendor list, and by how much. |
+| `user_discount_percent`, `user_tier_discounts` | Your account's own discount, if any, on top of the public one. |
+| `tokens_per_sec`, `tokens_per_sec_approx` | Measured throughput, for picking between models of similar quality. |
+| `credit_metered`, `usd_per_credit` | Set on the Topaz restoration models, which meter in credits. |
+| `capabilities` | Reference-input caps, resolutions, aspect ratios and duration range for media models. |
+
+The response also carries `default_model` — currently **`claude-haiku-4-5`**,
+used when a chat request omits `model`.
+
+<Callout kind="warning">
+  For video models, treat `capabilities` as a hint and the
+  [video request reference](/llm/video#request-body) as the contract. A few
+  entries still advertise resolutions and reference caps that the request
+  validator refuses — `seedance-2-5` renders 480p/720p only, and Veo 3.1
+  accepts durations of 4, 6 or 8 seconds, not 5.
+</Callout>
+
+## Text & reasoning models
+
+Thirteen vendor families. Exact slugs and prices come from the catalog; this
+is the map of what's on the shelf.
+
+| Vendor | Lines available | Best for |
+|--------|-----------------|----------|
+| **Anthropic** | Claude Opus 5, Sonnet 5, Fable 5; Opus 4.8 / 4.7 / 4.6 / 4.5, Sonnet 4.6 / 4.5, Haiku 4.5 | General reasoning, coding, agents |
+| **OpenAI** | GPT-6 Astra; GPT-5.6, 5.5, 5.4, 5.2 Pro; the Codex line (5.3 / 5.2 / 5.1); o3, o3-pro, o4-mini; GPT-4.1, GPT-4o | Reasoning, structured output, vision |
+| **Google** | Gemini 3.7 Flash, 3.5 Flash, 3.1 Pro, 3 Pro / Flash, 2.5 Pro / Flash; Gemma 4 / 3 | Long context, fast batch work |
+| **xAI** | Grok 4.5, 4.3, 4.2, 4.1 (incl. Thinking / Fast), Grok 4, `grok-code-fast-1` | Real-time knowledge, low latency |
+| **DeepSeek** | V4 Pro / Flash, V3.2 (+ Thinking), V3.1 / Terminus, R1 family, Chat, OCR | Cost-efficient reasoning, OCR |
+| **Qwen** (Alibaba) | Qwen3.6 Max / Plus / Flash, Qwen3.5 line, QwQ, Qwen-VL | Open-weight scale, vision, cheap long context |
+| **Zhipu** | GLM-5.2, 5.1, 5, 4.7 (+ Flash / Thinking), GLM-4V, GLM-OCR | Multilingual, OCR, low cost |
+| **Moonshot** | Kimi K2.7 Code, K2.6, K2.5, K2 (+ Thinking), Moonshot v1 | Long context, agentic coding |
+| **ByteDance** | Doubao Seed 1.6 (+ Thinking / Flash / Lite), Doubao 1.5 Pro | Chinese-first workloads |
+| **MiniMax** | M3, M2.7, M2.5, M2.1, M2; MiMo v2.5 | Balanced cost, multilingual |
+
+Filter the catalog by `category` to narrow it — `flagship` for the top of each
+line, `fast` for the cheap high-throughput tier.
+
+## How pricing works
+
+Every surface bills against the same USD balance, but the *unit* differs:
+
+| Media kind | Unit | Charged when |
+|------------|------|--------------|
+| Text | per million tokens, input and output priced separately | On completion. `completion_tokens` includes any hidden reasoning tokens. |
+| Image | flat, per delivered image | When the completion poll returns the image. |
+| Video | per clip, or per second of output — depends on the model | When the completion poll returns `video.url`. |
+| Music | per call (some models return two tracks for it) | When the completion poll returns the tracks. |
+| Speech & audio | per 1000 characters, or per second | On completion. |
+| Topaz restoration | per credit, `$0.14` / credit | On completion. See [Topaz](/llm/topaz#pricing). |
+
+A failed, refused or timed-out media job costs nothing. For media, the kickoff
+response carries `estimated_cost_usd` and the completion response carries the
+authoritative `cost_usd` and your new `balance_usd`.
+
+### Discounts
+
+Most models are sold below vendor list price, but **the discount is per model,
+not a flat platform rate** — it ranges from 7.5% to 30% depending on what the
+weights cost us wholesale. Read `discount_percent_label` for the public
+discount on a given slug and `discounted` for whether one applies at all.
+
+Account-level discounts stack on top and appear in the same record as
+`user_discount_percent` / `user_tier_discounts`, so the catalog you fetch with
+your key already reflects your price.
+
+### The open-weight tier
+
+Open-weight models — `deepseek-v4-pro`, `deepseek-v4-flash`, `gpt-oss-120b`
+and the Qwen / GLM / Kimi lines — are not priced from a fixed catalog number.
+They are priced from the *cheapest live rate available for those weights*,
+plus our margin, and that moves as the market moves.
+
+This is why no number for them is printed here: anything published would be
+stale within days. Read the live figure from the catalog or the model card in
+[/chat](https://gpuniq.com/chat).
+
+## Your balance
+
+Requests are billed directly against your GPUniq account balance in **USD**.
+There is no separate token pool — prepaid token packages and ruble-to-token
+conversion were retired, and the balance is shared with every other GPUniq
+surface, so one deposit covers GPU rentals, volumes and every model here.
+
+<CodeGroup>
+```python Python SDK
+balance = client.llm.balance()
+print(f"Available: ${balance['balance_usd']:.4f} USD")
+```
+
+```bash cURL
+curl https://api.gpuniq.com/v1/llm/balance \
+  -H "Authorization: Bearer gpuniq_your_key"
+```
+</CodeGroup>
+
+Top up from the **web dashboard → Balance**: card or SBP through T-Bank, or
+card through Stripe.
+
+## Usage history
+
+Per-request detail with prompt / completion / cached / reasoning tokens and
+the USD charged.
+
+```python
+history = client.llm.usage_history(limit=50, offset=0)
+for log in history["logs"]:
+    print(f"{log['model']}: {log['total_tokens']} tokens — ${log['cost_usd']:.6f}")
+```
+
+| Endpoint | Returns |
+|----------|---------|
+| `GET /v1/llm/usage/history` | Per-request log lines, newest first. |
+| `GET /v1/llm/usage/breakdown` | Daily / weekly aggregates by model. |
+| `GET /v1/llm/usage/requests` | Request-level records, with `GET /v1/llm/usage/requests/{log_id}` for one in full. |
+
+<Callout kind="info">
+  `completion_tokens` counts hidden reasoning tokens as well as the visible
+  reply. On reasoning models the gap between what you read and what you pay
+  for is real, not a billing error — see
+  [Long generations](/llm/long-generations#4-reasoning-models-need-extra-max_tokens-headroom).
+</Callout>
+
+## Model throughput
+
+`GET /v1/llm/models/{slug}/performance` returns measured throughput for one
+model — useful when two models are close on quality and you are choosing on
+latency. The same figure appears in the catalog as `tokens_per_sec`, with
+`tokens_per_sec_approx` flagging whether it is a measurement or an estimate.
+
+```bash
+curl https://api.gpuniq.com/v1/llm/models/claude-opus-5/performance \
+  -H "X-API-Key: gpuniq_your_key"
+```

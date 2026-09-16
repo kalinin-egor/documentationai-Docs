@@ -56,7 +56,8 @@
         "introduction",
         "quickstart",
         "sdk",
-        "cli"
+        "cli-client",
+        "cli-gpu"
       ]
     },
     {
@@ -69,19 +70,24 @@
       ]
     },
     {
-      "group": "Platform",
+      "group": "LLM & Media API",
+      "pages": [
+        "llm",
+        "llm/models",
+        "llm/chat",
+        "llm/openai-compat",
+        "llm/images",
+        "llm/video",
+        "llm/audio",
+        "llm/topaz",
+        "llm/long-generations",
+        "llm/errors"
+      ]
+    },
+    {
+      "group": "Storage & Account",
       "pages": [
         "volumes",
-        {
-          "group": "LLM & Image API",
-          "pages": [
-            "llm",
-            "llm/topaz",
-            "llm/long-generations",
-            "llm/errors"
-          ]
-        },
-        "payments",
         "settings"
       ]
     },

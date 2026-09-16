@@ -1,0 +1,184 @@
+---
+title: Chat & completions
+description: The native GPUniq chat API — completions, server-side chat sessions with full history, shareable transcripts, the generations library, and natural-language to shell commands.
+---
+
+The native surface at `/v1/llm/*` returns GPUniq's wrapped envelope and adds
+what the OpenAI protocol has no room for: server-side chat sessions, USD cost
+on every response, and the generations library.
+
+If you want a drop-in replacement for `api.openai.com` instead — for Claude
+Code, Cursor, Aider or the official SDKs — use
+[OpenAI compatibility](/llm/openai-compat).
+
+<Callout kind="info">
+  Requests are authenticated with `X-API-Key: gpuniq_...` on native routes
+  (a dashboard JWT via `Authorization: Bearer` also works). The default model
+  when you omit `model` is **`claude-haiku-4-5`**.
+</Callout>
+
+## Simple chat
+
+<CodeGroup>
+```python Python SDK
+response = client.llm.chat("claude-haiku-4-5", "Explain how transformers work")
+print(response)
+```
+
+```bash cURL
+curl -X POST "https://api.gpuniq.com/v1/llm/chat/completions" \
+  -H "X-API-Key: gpuniq_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [{"role": "user", "content": "Explain how transformers work"}],
+    "model": "claude-haiku-4-5"
+  }'
+```
+</CodeGroup>
+
+## Chat completion (full)
+
+```python
+data = client.llm.chat_completion(
+    messages=[
+        {"role": "system", "content": "You are a helpful AI assistant."},
+        {"role": "user", "content": "What is gradient descent?"},
+    ],
+    model="claude-sonnet-4-6",
+    temperature=0.7,
+    max_tokens=1000,
+    top_p=0.9,
+)
+
+print(data["content"])
+print(f"Tokens used: {data['tokens_used']}  cost: ${data['cost_usd']:.6f}")
+```
+
+### Parameters
+
+<ParamField body="messages" type="object[]" required>
+  List of message objects with `role` ("system", "user", "assistant") and `content`.
+</ParamField>
+
+<ParamField body="model" type="string">
+  Model slug (e.g., `claude-opus-4-7`, `gpt-5.2`, `gemini-3-pro`). Defaults to `claude-haiku-4-5`.
+</ParamField>
+
+<ParamField body="max_tokens" type="integer">
+  Maximum tokens in the response.
+</ParamField>
+
+<ParamField body="temperature" type="number">
+  Sampling temperature (0.0-2.0). Higher = more creative.
+</ParamField>
+
+<ParamField body="top_p" type="number">
+  Top-p nucleus sampling parameter.
+</ParamField>
+
+<Callout kind="warning">
+  A non-streaming request asking for `max_tokens > 4096` is rejected up front
+  with `streaming_required`. Set `"stream": true` or use the job-based
+  long-poll API — see [Long generations](/llm/long-generations).
+</Callout>
+
+## Chat sessions
+
+Persistent conversations stored server-side — the model sees the full history
+on every call, so you send one message rather than re-uploading the transcript.
+
+Persistent conversations stored server-side — the model sees the full history on every call:
+
+```python
+# Create a session
+session = client.llm.create_chat_session(
+    model="claude-sonnet-4-6",
+    title="Research Assistant",
+)
+
+# Send messages within the session
+reply = client.llm.send_message(
+    chat_id=session["id"],
+    message="What are the key papers on attention mechanisms?",
+    temperature=0.5,
+)
+
+# List all sessions
+sessions = client.llm.list_chat_sessions(limit=50)
+
+# Get a session with full message history
+full = client.llm.get_chat_session(chat_id=session["id"])
+
+# Update title
+client.llm.update_chat_session(chat_id=session["id"], title="New Title")
+
+# Delete
+client.llm.delete_chat_session(chat_id=session["id"])
+```
+
+### Sharing a transcript
+
+`POST /v1/llm/chats/{chat_id}/share` returns a public link to a read-only copy
+of the conversation, reusing the existing link if one was already created.
+Anyone with the token can read it through
+`GET /v1/llm/chats/shared/{share_token}` without a key.
+
+```bash
+curl -X POST https://api.gpuniq.com/v1/llm/chats/42/share \
+  -H "X-API-Key: gpuniq_your_key"
+```
+
+### Messages and context
+
+| Endpoint | What it does |
+|----------|--------------|
+| `GET /v1/llm/chats/{chat_id}/messages` | Page through a session's messages. |
+| `DELETE /v1/llm/chats/{chat_id}/messages/{message_id}` | Remove one message from the history. |
+| `GET /v1/llm/chats/{chat_id}/context` | The context the model will actually see on the next turn — useful when a long session starts getting trimmed. |
+| `POST /v1/llm/chats/{chat_id}/turns` | Append a turn without generating a reply. |
+
+### Generating images inside a session
+
+Posting to `/v1/llm/chats/{chat_id}/messages` with an image model puts the
+prompt and the resulting image into the chat history as a turn. See
+[Generating an image inside a chat session](/llm/images#generating-an-image-inside-a-chat-session).
+
+## The generations library
+
+Every image, video, music and audio generation you run is recorded. `GET
+/v1/llm/generations` returns a page of them, newest first.
+
+| Query parameter | Effect |
+|-----------------|--------|
+| `kind` | Filter by media kind. |
+| `model` | Filter by model slug. |
+| `q` | Free-text search over prompts. |
+| `limit` | Page size, default 40. |
+| `before_id` | Pass the previous page's `next_before_id` to continue. A null there means there is nothing older. |
+
+`GET /v1/llm/generations/{generation_id}` returns one in full; `DELETE` on the
+same path removes it.
+
+```bash
+curl "https://api.gpuniq.com/v1/llm/generations?kind=video&limit=20" \
+  -H "X-API-Key: gpuniq_your_key"
+```
+
+## Generate terminal commands
+
+Convert natural language to a ranked list of shell commands with danger annotations:
+
+```python
+cmds = client.llm.generate_commands(
+    prompt="find all Python files larger than 1MB and sort by size",
+    max_commands=5,
+)
+for c in cmds["commands"]:
+    print(f"[{c['danger']}] {c['command']}  # {c['description']}")
+```
+
+## Errors
+
+Every failure returns a structured `error_code` you can branch on. The full
+catalog, envelope shapes and recovery recipes live in the
+[Error reference](/llm/errors).

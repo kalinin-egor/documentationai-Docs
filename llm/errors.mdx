@@ -379,7 +379,7 @@ Video kickoff errors fold into the tables above, but a few combinations come up 
 }
 ```
 
-**Fix:** follow the error — either drop the field or move to a model that has the input. The per-model matrix is in [Which model takes which reference input](/llm#which-model-takes-which-reference-input).
+**Fix:** follow the error — either drop the field or move to a model that has the input. The per-model matrix is in [Which model takes which reference input](/llm/video#which-model-takes-which-reference-input).
 
 <Callout kind="info">
   **If you saw this combination succeed before, you were not imagining
@@ -391,7 +391,7 @@ Video kickoff errors fold into the tables above, but a few combinations come up 
   with the message above, every time.
 </Callout>
 
-**6. Reference media rejected at submit.** The upstream fetched your `video_url` / `image_url` and refused it. Since 2026-08-15 the two most common causes are handled for you: a link whose host declares the wrong `Content-Type` (`application/octet-stream` instead of `video/mp4` — the Google Drive case) is re-hosted automatically, and `data:` URIs are materialised into real links on every media field. What remains is a link with **no fetchable file behind it** — a `/view` page, a sign-in redirect, or a share that is not set to "anyone with the link". See [Reference media: what format to send](/llm#reference-media-what-format-to-send).
+**6. Reference media rejected at submit.** The upstream fetched your `video_url` / `image_url` and refused it. Since 2026-08-15 the two most common causes are handled for you: a link whose host declares the wrong `Content-Type` (`application/octet-stream` instead of `video/mp4` — the Google Drive case) is re-hosted automatically, and `data:` URIs are materialised into real links on every media field. What remains is a link with **no fetchable file behind it** — a `/view` page, a sign-in redirect, or a share that is not set to "anyone with the link". See [Reference media: what format to send](/llm/video#reference-media-what-format-to-send).
 
 **Fix:** open the URL in a private browser window. If you do not get the file itself, neither do we — make the share public and use a direct-download link, or send the clip as a `data:` URI and skip hosting entirely.
 
@@ -440,7 +440,7 @@ the next one instead. If every upstream is silent you get an
 
 `max_tokens > 4096` without `stream: true` is now rejected up-front. Previously, GPUniq would silently upgrade the upstream call to streaming and reassemble the SSE chunks into a non-stream response. That worked for SDKs but ate connections on every Cloudflare-fronted client (browsers, mobile, behind corporate proxies). The new behaviour is to fail fast with a clear error code and `doc_url` so the client can react.
 
-**Fix:** add `"stream": true` to the request body. If your client can't speak SSE, use the [`POST /v1/llm/chat/jobs`](/llm/long-generations#job-based-long-poll-api) job-based pattern instead.
+**Fix:** add `"stream": true` to the request body. If your client can't speak SSE, use the [`POST /v1/llm/chat/jobs`](/llm/long-generations#3-job-based-long-poll-api) job-based pattern instead.
 
 ### "I get `insufficient_balance` but my dashboard shows funds."
 

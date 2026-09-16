@@ -1,0 +1,205 @@
+---
+title: OpenAI & Anthropic compatibility
+description: Drop-in replacements for api.openai.com and api.anthropic.com — Chat Completions, the Responses API, and a native Messages endpoint that Claude Code talks to without a proxy.
+---
+
+Three wire protocols reach the same models, the same balance and the same
+usage log. Pick whichever your tooling already speaks.
+
+| Protocol | Base URL | Auth header |
+|----------|----------|-------------|
+| OpenAI Chat Completions, Responses, Images, Models | `https://api.gpuniq.com/v1/openai` | `Authorization: Bearer gpuniq_...` |
+| OpenAI Responses (bare path) | `https://api.gpuniq.com/v1` | `Authorization: Bearer gpuniq_...` |
+| Anthropic Messages | `https://api.gpuniq.com` | `x-api-key` or `Authorization: Bearer` |
+
+<Columns cols="3">
+  <Card title="Claude Code" href="#claude-code" icon="terminal">
+    Native `/v1/messages` — no LiteLLM, no proxy.
+  </Card>
+  <Card title="Cursor" href="#cursor" icon="edit">
+    Override the OpenAI base URL in settings.
+  </Card>
+  <Card title="Aider & friends" href="#continuedev-aider-litellm" icon="tool">
+    Anything that reads `OPENAI_BASE_URL`.
+  </Card>
+</Columns>
+
+## OpenAI Chat Completions
+
+Point any OpenAI-compatible tool at GPUniq by setting two environment variables:
+
+```bash
+OPENAI_API_KEY=gpuniq_your_key
+OPENAI_BASE_URL=https://api.gpuniq.com/v1/openai
+```
+
+Every field of the OpenAI Chat Completions protocol is forwarded unchanged: `tools`, `tool_choice`, `response_format`, `logprobs`, `seed`, `stream`, `stream_options`, etc.
+
+### Official OpenAI SDK
+
+<CodeGroup>
+```python Python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="gpuniq_your_key",
+    base_url="https://api.gpuniq.com/v1/openai",
+)
+
+resp = client.chat.completions.create(
+    model="claude-opus-4-7",
+    messages=[{"role": "user", "content": "Write a binary search in Rust."}],
+)
+print(resp.choices[0].message.content)
+```
+
+```javascript Node
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  apiKey: "gpuniq_your_key",
+  baseURL: "https://api.gpuniq.com/v1/openai",
+});
+
+const resp = await client.chat.completions.create({
+  model: "claude-opus-4-7",
+  messages: [{ role: "user", content: "Write a binary search in Rust." }],
+});
+console.log(resp.choices[0].message.content);
+```
+
+```bash cURL
+curl https://api.gpuniq.com/v1/openai/chat/completions \
+  -H "Authorization: Bearer gpuniq_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-opus-4-7",
+    "messages": [{"role": "user", "content": "Write a binary search in Rust."}]
+  }'
+```
+</CodeGroup>
+
+### Streaming
+
+Set `stream: true` — GPUniq returns a `text/event-stream` with byte-identical OpenAI SSE framing:
+
+```python
+stream = client.chat.completions.create(
+    model="gpt-5.2",
+    messages=[{"role": "user", "content": "Explain MoE in one paragraph."}],
+    stream=True,
+)
+for chunk in stream:
+    delta = chunk.choices[0].delta.content
+    if delta:
+        print(delta, end="", flush=True)
+```
+
+## Images
+
+`POST /v1/openai/images/generations` matches OpenAI's `images.generate`
+protocol and accepts any image slug in the catalog. It is a **legacy
+surface** kept so OpenAI-SDK code runs unmodified: it holds the connection
+open for the whole render and a client that disconnects mid-render is still
+charged for an image it never receives.
+
+For anything new use the job API. Full parameter reference, per-model shape
+tables and the migration recipe: [Image generation](/llm/images).
+
+## The Responses API
+
+`POST /v1/responses` (and `POST /v1/openai/responses`) implements OpenAI's
+Responses protocol against the same catalog, for SDK code written against
+`client.responses.create`.
+
+```python Python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="gpuniq_your_key",
+    base_url="https://api.gpuniq.com/v1",
+)
+
+resp = client.responses.create(
+    model="gpt-5.5",
+    input="Summarise the CAP theorem in three bullets.",
+)
+print(resp.output_text)
+```
+
+## Anthropic Messages
+
+GPUniq exposes a **native Anthropic Messages API** at `POST /v1/messages` —
+not a translation layer bolted onto the OpenAI surface. It accepts the
+standard Messages body (`model`, `messages`, `system`, `max_tokens`, `tools`,
+`stream`) and, with `stream: true`, returns the Anthropic SSE event sequence
+(`message_start` → `content_block_*` → `message_delta` → `message_stop`).
+Errors come back in the Anthropic error shape, so the official SDK's typed
+exceptions work unchanged.
+
+```python Python
+import anthropic
+
+client = anthropic.Anthropic(
+    api_key="gpuniq_your_key",
+    base_url="https://api.gpuniq.com",
+)
+
+msg = client.messages.create(
+    model="claude-opus-5",
+    max_tokens=1024,
+    messages=[{"role": "user", "content": "Write a binary search in Rust."}],
+)
+print(msg.content[0].text)
+```
+
+<Callout kind="info">
+  **Reach for this endpoint when the model is a Claude model and the request
+  carries `tools`.** `/v1/messages` is Anthropic's own protocol, so tool
+  definitions and tool results travel without a translation step in the
+  middle — which is where tool round-trips are most likely to lose fidelity.
+</Callout>
+
+## Claude Code
+
+[Claude Code](https://docs.claude.com/en/docs/claude-code) talks to GPUniq directly — GPUniq exposes a native Anthropic Messages API at `/v1/messages`, so no LiteLLM (or any other) proxy is required. Point Claude Code's environment variables straight at GPUniq:
+
+```bash
+export ANTHROPIC_BASE_URL=https://api.gpuniq.com
+export ANTHROPIC_API_KEY=gpuniq_your_key
+export ANTHROPIC_MODEL=claude-opus-4-7              # main model
+export ANTHROPIC_SMALL_FAST_MODEL=claude-haiku-4-5  # background/small model
+claude
+```
+
+Use any Claude slug from `/v1/openai/models` for the two model variables. Streaming and tool use work out of the box. All tokens are billed against your GPUniq balance — no separate Anthropic account required.
+
+<Callout kind="info">
+Set `ANTHROPIC_SMALL_FAST_MODEL` too: Claude Code calls a smaller "background" model for things like commit messages and titles. If it points at a slug GPUniq doesn't serve, those background calls fail even when the main model works.
+</Callout>
+
+## Cursor
+
+**Settings → Models → Override OpenAI Base URL**:
+
+```
+Base URL:  https://api.gpuniq.com/v1/openai
+API Key:   gpuniq_your_key
+Model:     claude-opus-4-7   # or any slug from /v1/openai/models
+```
+
+## Continue.dev / Aider / LiteLLM
+
+Any tool that accepts an `OPENAI_BASE_URL` works the same way:
+
+```bash
+export OPENAI_API_KEY=gpuniq_your_key
+export OPENAI_BASE_URL=https://api.gpuniq.com/v1/openai
+
+aider --model claude-sonnet-4-6
+```
+
+<Callout kind="info">
+  The OpenAI-compat endpoint returns raw OpenAI response objects (not wrapped in GPUniq's `ResponseSchema`). Errors use OpenAI's `{"error": {"message", "type", "code"}}` envelope so SDK retry logic works unchanged.
+</Callout>
+

@@ -15,7 +15,7 @@ description: Track the latest updates and improvements to GPUniq.
 picks the container of the delivered file — `mp4` (default), `mov` or
 `webm`. `output_quality` sets the encoder quality, `20`–`99` (upstream
 default `95`). Both are listed in the
-[request body table](/llm#request-body) with the models that honour
+[request body table](/llm/video#request-body) with the models that honour
 them: the Seedance 2 line and Kling 3.0 / O3 / 2.6 / 2.5 Turbo Pro;
 `seedance-2-5` also serves `mov` on its second route.
 
@@ -56,7 +56,7 @@ field our side forgot to send. The job then ended with
 That was never your request: the poll itself was HTTP 200, and
 `character_orientation` is optional (default `video`). The route is
 fixed, and `character_orientation` is now listed in the
-[request body table](/llm#request-body). Failed jobs were never
+[request body table](/llm/video#request-body). Failed jobs were never
 charged.
 
 ## Failed video jobs carry `error_code` and the useful reason
@@ -75,7 +75,7 @@ Otherwise `generation_failed`. See
 ## Seedance 2.5 is documented
 
 `seedance-2-5` has been in the catalog since 2026-08-10 but only
-`seedance-2` was written up. The [Seedance section](/llm#seedance-bytedance)
+`seedance-2` was written up. The [Seedance section](/llm/video#seedance-bytedance)
 now carries the full contract for it — slug, endpoint, the 4–30 s
 duration range (the longest single-job clip in the Seedance family),
 the 480p/720p-only resolution menu, every reference field with its
@@ -132,7 +132,7 @@ more than the old docs implied: `gpt-image-1-5` takes three pixel sizes
 has no `auto`; `wan-2-7-image` speaks pixel presets. A `size` outside a
 model's own set is now snapped to its closest listed shape instead of
 being passed through and ignored. The full table is in the
-[image parameters](/llm#parameters) section.
+[image parameters](/llm/images#parameters) section.
 
 </Update>
 
@@ -298,7 +298,7 @@ Non-Kling SKUs (Sora, Veo, Wan, Hailuo, Seedance) ignore the new
 fields — their flat-price catalog path is unchanged, and existing
 callers see no regression.
 
-Full reference: [LLM API → Video Generation](/llm#video-generation).
+Full reference: [LLM API → Video Generation](/llm/video).
 
 </Update>
 
@@ -343,7 +343,7 @@ fast with a clear hint:
 ```
 
 **Migration:** add `"stream": true` to the request body. If your client
-can't speak SSE, use the [job-based long-poll API](/llm/long-generations#job-based-long-poll-api).
+can't speak SSE, use the [job-based long-poll API](/llm/long-generations#3-job-based-long-poll-api).
 The threshold is configurable per-deployment; the 4096 default is the
 clean intersection of "fits in the 100s edge-proxy window" and "below
 every model's stream-chunk delivery rate".

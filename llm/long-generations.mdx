@@ -15,7 +15,7 @@ The edge proxy in front of GPUniq closes inbound connections after roughly **100
 |---|---|
 | ≤ 4096 output tokens, fast model | Plain `POST /chat/completions` works. |
 | > 4096 output tokens **OR** slow / reasoning model | **Set `"stream": true`**. |
-| Client can't speak SSE | Use [`POST /v1/llm/chat/jobs`](#job-based-long-poll-api) (long-poll pattern). |
+| Client can't speak SSE | Use [`POST /v1/llm/chat/jobs`](#3-job-based-long-poll-api) (long-poll pattern). |
 
 A non-streaming request with `max_tokens > 4096` is **rejected up-front** with HTTP 400 `streaming_required` — the buffered response would lose to the 100-second cap, so we fail fast instead of burning the upstream call. See [errors](/llm/errors#streaming) for the error envelope shape.
 

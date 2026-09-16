@@ -1,0 +1,539 @@
+---
+title: Image generation
+description: Text-to-image and image-to-image across Nano Banana, GPT Image 2, FLUX.2, Seedream, Z-Image, Kling and Midjourney — one async job API, billed per delivered image.
+---
+
+`POST /v1/llm/images/jobs` returns a `job_id` in under a second; you poll
+`GET /v1/llm/images/jobs/{job_id}` until the status is terminal. **Every image
+slug in the catalog works on the job API** — there is no subset to memorise and
+no model that still needs the synchronous route.
+
+Images are billed per delivered image, not per token, and only when the
+completion poll returns. A failed or timed-out job costs nothing.
+
+<Columns cols="3">
+  <Card title="Parameters" href="#parameters" icon="list">
+    `size`, `input_images`, `output_format` and the per-model shape tables.
+  </Card>
+  <Card title="Models & pricing" href="#models-pricing" icon="tag">
+    Every image slug with its price per image.
+  </Card>
+  <Card title="Midjourney" href="#midjourney" icon="image">
+    Grids, `mj_task_id`, variations — it works unlike everything else here.
+  </Card>
+</Columns>
+
+## Quick start
+
+`POST /v1/llm/images/jobs` returns a `job_id` in under a second, and you
+poll `GET /v1/llm/images/jobs/{job_id}` every 2-3 seconds until the
+status is terminal. You are charged only when the completion poll
+returns — a timed-out or failed job costs nothing. Server-side, polls
+that arrive within 2 seconds of each other are coalesced via Redis, so
+hammering the endpoint will not be billed as repeated upstream calls.
+
+A `status: "failed"` payload carries a typed `error_code` —
+`content_moderation` (the input was rejected by the upstream content
+policy; rephrase, don't retry verbatim) or `generation_failed`
+(transient; re-kick off). Give the poll loop a **10-minute budget**:
+moderation verdicts and internal retries can land several minutes after
+kickoff, and abandoning early costs you the render you would have
+received. Handling recipes:
+[Errors → Image jobs](/llm/errors#image-jobs-typed-failure-causes).
+
+```python Python
+import time, requests
+
+BASE = "https://api.gpuniq.com/v1/llm"
+HEADERS = {"X-API-Key": "gpuniq_your_key"}
+
+# 1. Kickoff
+start = requests.post(
+    f"{BASE}/images/jobs",
+    headers=HEADERS,
+    json={"model": "nano-banana-pro", "prompt": "a cozy cabin at sunrise", "n": 1},
+).json()
+job_id = start["data"]["job_id"]
+
+# 2. Poll — 10-minute budget: slow 4K renders, moderation verdicts and
+#    internal retries can all land several minutes after kickoff
+deadline = time.time() + 600
+while time.time() < deadline:
+    time.sleep(2.5)
+    r = requests.get(f"{BASE}/images/jobs/{job_id}", headers=HEADERS).json()
+    d = r["data"]
+    if d["status"] == "completed":
+        image_b64 = d["image"]["b64_json"]
+        print(f"Cost: ${d['cost_usd']}, balance: ${d['balance_usd']}")
+        break
+    if d["status"] == "failed":
+        if d.get("error_code") == "content_moderation":
+            # Content-policy verdict — retrying the same prompt will fail
+            # again. Rephrase (drop video-style wording: durations,
+            # camera moves) and kick off a new job.
+            print("rejected by content policy:", d.get("error"))
+        else:
+            # generation_failed — transient; safe to re-kick off.
+            print("failed:", d.get("error"))
+        break
+```
+
+## Parameters
+
+<ParamField body="model" type="string" required>
+  Any image slug from the [catalog](#models-pricing) — the Nano Banana family, `gpt-image-2` and its tiers, `gpt-image-1-5`, `gpt-4o-image`, `grok-4-image`, `flux-2-pro`, `flux-2-flex`, `flux-kontext-pro`, `flux-kontext-max`, `seedream-4`, `seedream-4-5`, `seedream-5-0-lite`, `seedream-5-pro`, `z-image`, `wan-2-7-image`, `wan-2-7-image-pro`, `kling-o1-image`, `kling-o3-image`, or the `mj_*` Midjourney actions. (Topaz upscaling models live on their own surface — see the [Topaz guide](/llm/topaz).)
+</ParamField>
+
+<ParamField body="prompt" type="string" required>
+  Text description of the image you want. Up to 20 000 characters, but the
+  per-model ceiling is lower on several models — 1 000 on `gpt-4o-image`,
+  `gpt-image-1-5` and `z-image`, 2 000 on the FLUX Kontext and Kling
+  image models, 3 000 on `seedream-4-5` / `seedream-5-0-lite`, 5 000 on
+  `nano-banana`, `seedream-4`, `flux-2-*` and `wan-2-7-*`. Over the limit
+  you get an `UPSTREAM_VALIDATION_ERROR` naming the ceiling rather than a
+  truncated render.
+</ParamField>
+
+<ParamField body="n" type="integer" default="1">
+  **Must be `1` on the job API** and on chat image turns — issue separate
+  jobs in parallel for a batch. Only the [legacy synchronous
+  endpoint](#the-legacy-synchronous-endpoint) accepts 2–4.
+</ParamField>
+
+<ParamField body="size" type="string">
+  Output resolution and shape. Accepts `WIDTHxHEIGHT` (e.g. `1024x1024`,
+  `2048x2048`, `4096x4096`), a bare tier (`1k` / `2k` / `4k`), or an
+  aspect-ratio string (`1:1`, `16:9`, `21:9`, …) when you care about shape
+  rather than exact pixels.
+
+  **Each model has its own set of output shapes** (below). A value that
+  isn't in the model's own set is snapped to the closest listed shape —
+  never dropped and never passed through unchanged. `nano-banana-2`
+  renders 1K–4K (default 2K); `nano-banana-pro` renders 1K–2K (use
+  `nano-banana-pro-4k` for 4K).
+
+  | Model | Accepted `size` |
+  | --- | --- |
+  | `nano-banana` | `1:1` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `9:16` `16:9` `21:9` |
+  | `nano-banana-2`, `nano-banana-pro`, `nano-banana-pro-4k` | `auto` + the ratios above |
+  | `gpt-image-2` (and the `-2k` / `-4k` tiers) | `auto` + the ratios above; exact `WIDTHxHEIGHT` on the 2K/4K tiers. 4K needs a non-square shape |
+  | `gpt-image-1-5` | `1024x1024`, `1024x1536`, `1536x1024` — **no 2K/4K tier exists for this model** |
+  | `gpt-4o-image` | `1:1` `2:3` `3:2` |
+  | `flux-2-pro`, `flux-2-flex` | `auto` `1:1` `4:3` `3:4` `16:9` `9:16` `3:2` `2:3` |
+  | `flux-kontext-pro`, `flux-kontext-max` | `1:1` `4:3` `3:4` `16:9` `9:16` `21:9` `9:21` |
+  | `seedream-4` | `1:1` `3:4` `4:3` `16:9` `9:16` `3:2` `2:3` `21:9` |
+  | `seedream-4-5` | the `seedream-4` ratios + `2K` / `4K` + custom `WIDTHxHEIGHT` |
+  | `seedream-5-0-lite` | the `seedream-4` ratios + `2K` / `3K` + custom `WIDTHxHEIGHT` |
+  | `seedream-5-pro` | the `seedream-4` ratios (renders 2K) |
+  | `z-image` | `1:1` `4:3` `3:4` `16:9` `9:16` |
+  | `wan-2-7-image`, `wan-2-7-image-pro` | `512x512` `1024x1024` `768x1024` `1024x768` `576x1024` `1024x576` |
+  | `kling-o1-image`, `kling-o3-image` | `16:9` `9:16` `1:1` `4:3` `3:4` `3:2` `2:3` `21:9` (`auto` on `kling-o1-image`) |
+</ParamField>
+
+<ParamField body="quality" type="string">
+  Optional upstream quality hint (e.g. `standard`, `hd`). Models that don't recognise the value silently fall back to their default.
+</ParamField>
+
+<ParamField body="response_format" type="string" default="b64_json">
+  `b64_json` returns inline PNG base64 (browser-renderable). `url` returns a short-lived upstream URL.
+</ParamField>
+
+<ParamField body="output_format" type="string">
+  Re-encode every delivered image into this format **on the server** before returning, so the client doesn't need a Pillow / Sharp pipeline. One of:
+
+  - `png` (default if omitted) — pass-through, lossless.
+  - `jpeg` (alias `jpg`) — ~10× smaller payload, alpha is flattened onto white because JPEG has no transparency.
+  - `webp` — ~5× smaller at comparable quality, alpha preserved.
+
+  Quality for the lossy formats is fixed at 92 — visually indistinguishable from the source PNG. Conversion failures degrade to "return source PNG unchanged" so you always get an image, never a 502 after the upstream has done the expensive work. The MIME type of the converted bytes is echoed back in `data[i].mime_type`.
+</ParamField>
+
+<ParamField body="input_images" type="string[]">
+  Optional reference photos for image-to-image / editing. Each entry is a
+  `data:` URL, `https://` URL, or bare base64 string. **Every image model
+  in the catalog accepts them** — passing `input_images` switches the model
+  into its edit mode automatically; you don't pick a separate "edit" slug.
+
+  The number of reference images a model reads differs:
+
+  | Model | Reference images |
+  | --- | --- |
+  | `flux-kontext-pro`, `flux-kontext-max`, `z-image` | 1 |
+  | `wan-2-7-image`, `wan-2-7-image-pro` | up to 4 |
+  | `flux-2-pro`, `flux-2-flex` | up to 8 |
+  | everything else | up to 10 |
+  | `kling-o1-image` | **at least 1 — this model is edit-only** |
+
+  Extras beyond a model's limit are trimmed (the first N are kept). A
+  request the model cannot serve — an edit-only model with no reference
+  image, a prompt over the model's length limit, a reference that is
+  neither a URL nor decodable base64 — comes back as a
+  `UPSTREAM_VALIDATION_ERROR` with a `hint` explaining the fix, instead of
+  quietly rendering something that ignores your input.
+
+  **Order is preserved end to end.** The array reaches the upstream in the
+  order you sent it, on every provider that can serve the model. Nothing
+  is reordered, deduplicated or promoted.
+
+  **There is no "start frame" on an image model.** Start / first / last
+  frames exist on the *video* API (`image_url`, `last_frame_url`), where
+  they condition motion. An image model takes one flat list of references
+  and assigns no meaning to position by itself — if reference #1 is the
+  product and #2 is the palette, say so in the prompt ("use the first
+  image for the product shape, the second for the colour palette").
+  Position without a prompt that names it carries no role.
+
+  For convenience the API accepts the spellings other tools use and folds
+  them into `input_images` — arrays `image_input`, `image`, `images`,
+  `image_urls`, `reference_images`, `reference_image_urls`, and scalars
+  `start_frame`, `start_frame_url`, `first_frame_url`, `image_url`,
+  `main_image`. A scalar "main image" becomes **element 0** of the
+  reference array. Sending the same URL under two names delivers it once.
+</ParamField>
+
+<Callout kind="info">
+  If the upstream returns fewer images than requested (content-policy rejects, partial failures, etc.), you are billed only for what was delivered.
+</Callout>
+
+## Models & pricing
+
+Image models are billed per returned image, not per token.
+
+| Model | Slug | Price / image | Notes |
+|-------|------|---------------|-------|
+| Nano Banana | `nano-banana` | $0.0312 | Fast text-to-image & image-to-image, 1K |
+| Nano Banana 2 | `nano-banana-2` | $0.0500 | Quality-value generation, 1K–4K (set via `size`) |
+| Nano Banana Pro | `nano-banana-pro` | $0.1072 | Higher quality, 1K–2K pixel budget (set via `size`; beyond-2K asks auto-upgrade to Pro 4K) |
+| Nano Banana Pro 4K | `nano-banana-pro-4k` | $0.192 | 4K resolution — also reached by `size` beyond the 2K pixel budget (~4.2 MP or >3168px wide) |
+| Grok 4 Image | `grok-4-image` | $0.064 | xAI image generator |
+| GPT Image 2 | `gpt-image-2` | $0.0464 | OpenAI image, 1K tier (higher `size` auto-upgrades, see below) |
+| GPT Image 2 · 2K | `gpt-image-2-2k` | $0.07 | 2K tier — also reached by `size` up to 2048px |
+| GPT Image 2 · 4K | `gpt-image-2-4k` | $0.11 | 4K tier — also reached by `size` above 2048px |
+| GPT Image 1.5 | `gpt-image-1-5` | $0.020 | OpenAI image (cheaper tier) |
+| GPT-4o Image | `gpt-4o-image` | $0.040 | OpenAI 4o image |
+| FLUX.2 Pro | `flux-2-pro` | $0.060 | Black Forest Labs FLUX.2 Pro 1K |
+| FLUX.2 Flex | `flux-2-flex` | $0.180 | Premium quality 1K |
+| Flux Kontext Pro | `flux-kontext-pro` | $0.080 | Text-to-image & edit |
+| Flux Kontext Max | `flux-kontext-max` | $0.160 | Premium edit / generation |
+| Seedream 4 | `seedream-4` | $0.050 | ByteDance Seedream 4 |
+| Seedream 4.5 | `seedream-4-5` | $0.040 | ByteDance Seedream 4.5 |
+| Seedream 5.0 Lite | `seedream-5-0-lite` | $0.035 | ByteDance Seedream 5.0 Lite |
+| Seedream 5 Pro | `seedream-5-pro` | $0.100 | ByteDance Seedream 5 Pro, 2K |
+| Z-Image | `z-image` | $0.020 | Alibaba Z-Image |
+| Wan 2.7 Image | `wan-2-7-image` | $0.030 | Alibaba Wan 2.7 |
+| Wan 2.7 Image Pro | `wan-2-7-image-pro` | $0.075 | Alibaba Wan 2.7 Pro |
+| Kling O1 Image | `kling-o1-image` | $0.028 | **Edit-only** — requires `input_images` |
+| Kling O3 Image | `kling-o3-image` | $0.028 | Kling O3 text-to-image |
+| Midjourney | `mj_imagine` | $0.16 | v8.2 — four full-size concepts per call, billed once |
+| Midjourney Upscale | `mj_upscale` | $0.10 | Presses one frame's U-button — see the note below |
+| Midjourney Variation | `mj_variation` | $0.16 | Four new concepts derived from one frame |
+
+**How `size` picks the GPT Image 2 tier (and the price).** The `size`
+field accepts `WIDTHxHEIGHT` or a bare `1k` / `2k` / `4k`. The tier is
+chosen by a *ceiling* rule on the long side — the delivered image is
+never smaller than the ask: up to 1024px → base `gpt-image-2`
+($0.0464), up to 2048px → the 2K tier ($0.07), above 2048px → the 4K
+tier ($0.11). The response's `usage.model` (sync) / `model` (job) names
+the tier you were billed for, and the kickoff's `estimated_cost_usd`
+reflects it up front. Aspect ratio follows your `size` proportions —
+wide and tall formats including `21:9` and `3:2` are honoured, with or
+without reference images.
+
+**Nano Banana Pro** upgrades by *pixel budget*, not by long side —
+banana tiers scale output with the aspect ratio (the 2K tier at 16:9
+renders 2752×1536), so a QHD `2560x1440` ask stays on the base Pro
+($0.1072) and comes back at 2752×1536. Only asks beyond the 2K budget
+(more than ~4.2 MP, or wider than 3168px) auto-upgrade to
+`nano-banana-pro-4k` ($0.192).
+
+GPT Image 2 2K/4K renders now return the **exact width×height you
+asked for** (up to a 3840px long side; larger asks scale down
+proportionally, e.g. 4096×4096 → 3840×3840) and typically complete in
+**40–80 seconds**. If the primary route rejects a request, GPUniq
+retries on an alternate 2K/4K route automatically; if the *content*
+itself is rejected everywhere, the request degrades once to the base
+`gpt-image-2` at the base price ($0.0464, ~1.6K render) — the response's
+`model` field always names the SKU you were billed for.
+
+**Nano Banana 4K output dimensions depend on the aspect ratio** — the
+tier fixes the pixel *budget*, not the long side, so wide formats come
+back wider than 4096px. Expect these dimensions from the 4K tier
+(`nano-banana-pro-4k`, `nano-banana-2` at 4K):
+
+| Aspect | 4K output |
+|--------|-----------|
+| 1:1 | 4096 × 4096 |
+| 16:9 / 9:16 | 5504 × 3072 / 3072 × 5504 |
+| 3:2 / 2:3 | 5056 × 3392 / 3392 × 5056 |
+| 4:3 / 3:4 | 4800 × 3584 / 3584 × 4800 |
+| 21:9 | 6336 × 2688 |
+
+4K renders on this family take noticeably longer than 1K/2K —
+**2–5 minutes is normal**, which is another reason to keep the job
+polling budget at 10 minutes.
+
+## Midjourney
+
+Midjourney works differently from every other model here, because
+Midjourney itself has no public API: a render is a *job on a real
+Midjourney account*, and the unit of work is a **grid**, not a picture.
+
+**One `mj_imagine` call buys one Midjourney job: four concepts, for
+$0.16.** You normally receive them as **four separate full-size frames**
+(1456×816 at 16:9) — not a grid you have to crop. Billing is per *job*,
+never per frame, so four images cost exactly the same as one. Renders
+take **55–95 seconds**, so use the job API.
+
+<Callout kind="info">
+  **You probably do not need `mj_upscale`.** On Midjourney v7 — today's
+  default — the four frames already arrive at full size, and the
+  U-button returns a byte-identical copy of the frame you already have.
+  It earns its price only on v5/v6 prompts (`--v 6.1`), where the four
+  tiles genuinely are quarters of a 1024px sheet.
+</Callout>
+
+Every delivered Midjourney image carries an `mj_task_id`. Pass it back
+with `mj_index` (1–4, reading order — 1 is top-left) to run an action on
+that frame:
+
+```python
+# 1. The render — four concepts, one charge
+job = requests.post(f"{BASE}/v1/llm/images/jobs", headers=H, json={
+    "model": "mj_imagine",
+    "prompt": "an owl librarian in a candlelit archive",
+    "size": "16:9",          # or 1920x1080 — becomes Midjourney's --ar
+}).json()["data"]
+# ... poll GET /v1/llm/images/jobs/{job_id} until status == "completed"
+
+# 2. More like frame 2, please
+requests.post(f"{BASE}/v1/llm/images/jobs", headers=H, json={
+    "model": "mj_variation",
+    "mj_task_id": done["image"]["mj_task_id"],
+    "mj_index": 2,                      # no prompt needed for actions
+})
+```
+
+`mj_variation` returns a fresh set of four concepts built from the frame
+you picked — same price as an imagine, because it is the same amount of
+work.
+
+Notes worth knowing before you build on it:
+
+- **`size` is an aspect ratio, not a resolution.** `16:9`, `3:2` and
+  `1920x1080` all work; the ratio is what reaches Midjourney (`--ar`).
+  Output resolution is Midjourney's own.
+- **You get Midjourney v8.2 by default** — the newest line. Relays
+  default to v7 if nobody asks, so we ask. Pin another with a version
+  flag in the prompt (`--v 6.1`, `--niji 7`) and yours wins.
+- **Midjourney parameters pass through the prompt.** Anything you write
+  as `--stylize 750`, `--chaos 20`, `--niji 6` and so on is honoured;
+  an `--ar` you write yourself wins over `size`.
+- **Reference images work** via `input_images` (https URLs or data URLs).
+- **`mj_task_id` is opaque and route-bound.** Store it as a string and
+  pass it back unchanged; upscales and variations run where the grid
+  lives, so a handle from one render is not valid for another.
+- **A rejected prompt is final.** Midjourney's content filter is
+  Midjourney's own — a `400` comes back immediately rather than being
+  retried elsewhere, so rephrase rather than retrying verbatim.
+
+## Generating an image inside a chat session
+
+When you want the image to appear as a turn in an existing chat (so the
+prompt and result both land in the chat history), POST to
+`/v1/llm/chats/{chat_id}/messages` with an image model. The response
+returns immediately with `type: "image_pending"` plus a `job_id` and the
+`dialogue_id` of a placeholder row that already lives in the chat
+history. Poll `GET /v1/llm/chats/{chat_id}/image-jobs/{job_id}` until
+the status is `completed` (placeholder is rewritten with the image and
+the balance is debited) or `failed` (placeholder is marked, nothing
+charged). The polling endpoint 404s once the job is terminal — the
+final dialogue is the source of truth from then on.
+
+```python Python
+import time, requests
+
+BASE = "https://api.gpuniq.com/v1/llm"
+HEADERS = {"X-API-Key": "gpuniq_your_key"}
+chat_id = 42  # existing chat created via POST /v1/llm/chats
+
+# 1. Kickoff (POST /chats/{id}/messages with an image model)
+start = requests.post(
+    f"{BASE}/chats/{chat_id}/messages",
+    headers=HEADERS,
+    json={"model": "nano-banana-pro", "message": "a cozy cabin at sunrise"},
+).json()
+job_id = start["data"]["job_id"]
+dialogue_id = start["data"]["dialogue_id"]
+
+# 2. Poll — same 5-minute budget as the standalone /images/jobs flow
+deadline = time.time() + 300
+while time.time() < deadline:
+    time.sleep(2.5)
+    r = requests.get(
+        f"{BASE}/chats/{chat_id}/image-jobs/{job_id}", headers=HEADERS,
+    ).json()
+    d = r["data"]
+    if d["status"] == "completed":
+        image_b64 = d["image"]["b64_json"]
+        print(f"Cost: ${d['cost_usd']}, balance: ${d['balance_usd']}")
+        break
+    if d["status"] == "failed":
+        print("failed:", d.get("error"))
+        break
+```
+
+Use this surface when the image should be part of a multi-turn
+conversation. Use the standalone `/images/jobs` surface when you don't
+need persistence — it has the same job semantics without creating a
+chat row.
+
+## Which endpoint serves which slug
+
+**Every image slug in the catalog works on the job API.** There is no
+subset to memorise and no reason to keep a synchronous code path around:
+if the model is in the table above, `POST /v1/llm/images/jobs` accepts it.
+
+`n` must be `1` — issue separate jobs in parallel for batches. (Topaz
+upscaling/enhancement has its own dedicated job surface — see the
+[Topaz guide](/llm/topaz).)
+
+Behind the job id there are two execution modes, and the difference is
+not visible in the API contract — same kickoff, same polling, same
+response shape:
+
+| Mode | Slugs | Typical kickoff → first `completed` poll |
+|------|-------|------------------------------------------|
+| Native async upstream | Nano Banana line, `gpt-image-2` family | unchanged |
+| Server-side render behind the job id | everything else in the catalog | unchanged for the client; the render occupies a worker rather than an upstream queue |
+
+The second mode runs the same multi-tier provider cascade the synchronous
+endpoint uses, so failover, moderation verdicts and format conversion all
+behave identically. You are still charged only on delivery.
+
+**Video has no synchronous endpoint at all.** Every video generation goes
+through `POST /v1/llm/videos/jobs` — there is nothing to migrate and no
+sync variant to find.
+
+<Callout kind="info">
+  **Migrating off the synchronous endpoint.** The job API is a drop-in
+  replacement for `POST /v1/llm/images/generations` for every slug: send
+  the same body to `/images/jobs`, read `data.job_id`, then poll
+  `GET /v1/llm/images/jobs/{job_id}` until `status` is terminal. The
+  image arrives as `data.image.b64_json`, and `data.cost_usd` /
+  `data.balance_usd` replace the sync response's equivalents. The only
+  behavioural difference is the one you want: a dropped connection can no
+  longer cost you an image you never receive.
+</Callout>
+
+## The legacy synchronous endpoint
+
+<Callout kind="warning">
+  **Use the job-based API. The synchronous endpoint is legacy.**
+
+  `POST /v1/llm/images/jobs` (below) is the supported path: it returns a
+  `job_id` in under a second, survives any CDN idle-read limit, and bills
+  only on delivery. The synchronous `POST /v1/llm/images/generations`
+  (and its OpenAI-compat twin `POST /v1/openai/images/generations`) holds
+  the connection open for the full 5-minute upstream budget and is kept
+  only so existing OpenAI-SDK code keeps running. **The job API now
+  covers every image slug in the catalog** — there is no model that
+  requires the synchronous route. Do not build new integrations on it.
+
+  A held-open request is also the one that loses work: if the client
+  disconnects mid-render the image is still generated and still billed,
+  but you never receive it. Jobs have no such failure mode.
+
+  The synchronous route has a **300-second budget for the whole provider
+  cascade** — not per provider. When it runs out, the render is abandoned,
+  nothing is charged, and you get `504` with
+  `error_code: "render_timeout"`. Set your own client timeout above 300 s
+  (330 s is a good number) so you read our answer instead of your own
+  `fetch failed`. The job API is not bounded this way: it keeps the full
+  per-provider budgets because there is no connection to lose.
+</Callout>
+
+Both API surfaces expose a `/images/generations` endpoint that matches
+OpenAI's `images.generate` protocol. Pass any image slug from the
+catalog above (e.g. `nano-banana-pro`, `gpt-image-2`, `flux-2-pro`,
+`seedream-4`). Billing is flat per returned image — no token accounting.
+
+Image requests route through a multi-tier reliability chain behind the
+scenes: a per-model priority gateway, two cost-optimised intermediaries,
+then a generic OpenAI-compatible fallback for safety. The chain is
+selected automatically per slug, so SDK callers never pick a backend
+themselves. If the primary fails or returns no image, the next tier is
+tried within the same HTTP request — you still see one synchronous
+`POST /images/generations` and pay for delivered images only.
+
+Heavy generations (Pro / 4K, multi-image batches, high-quality preset)
+can run up to **5 minutes** end-to-end; the connection is held open for
+that whole budget so SDKs never need to re-poll.
+
+<Callout kind="warning">
+  **This synchronous surface is legacy.** It exists so OpenAI-SDK code
+  runs unmodified against GPUniq — it is no longer the only route for any
+  model, since the job API now covers the whole image catalog (see
+  [Which endpoint serves which slug](#which-endpoint-serves-which-slug)).
+  For anything new, use the
+  [job API](#quick-start): it returns in
+  under a second, cannot be killed by a proxy's idle-read limit, and
+  bills only on delivery. On this endpoint a client that disconnects
+  mid-render is still charged for an image it never receives.
+</Callout>
+
+<CodeGroup>
+```python Python (OpenAI SDK)
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="gpuniq_your_key",
+    base_url="https://api.gpuniq.com/v1/openai",
+)
+
+resp = client.images.generate(
+    model="nano-banana-pro",
+    prompt="A cozy mountain cabin at sunrise, cinematic lighting",
+    n=2,
+    size="1024x1024",
+    response_format="b64_json",
+)
+
+for i, img in enumerate(resp.data):
+    with open(f"out_{i}.png", "wb") as f:
+        import base64
+        f.write(base64.b64decode(img.b64_json))
+```
+
+```python Native (image-to-image)
+import base64, requests
+
+with open("reference.jpg", "rb") as fh:
+    ref = "data:image/jpeg;base64," + base64.b64encode(fh.read()).decode()
+
+resp = requests.post(
+    "https://api.gpuniq.com/v1/llm/images/generations",
+    headers={"X-API-Key": "gpuniq_your_key"},
+    json={
+        "model": "nano-banana-pro",
+        "prompt": "Redraw the cabin in watercolor style",
+        "n": 1,
+        "size": "2048x2048",
+        "input_images": [ref],
+    },
+).json()
+
+print("cost:", resp["data"]["cost_usd"])
+```
+
+```bash cURL
+curl -X POST https://api.gpuniq.com/v1/openai/images/generations \
+  -H "Authorization: Bearer gpuniq_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "grok-4-image",
+    "prompt": "Studio portrait of an astronaut in a pink desert",
+    "n": 1,
+    "size": "1024x1024"
+  }'
+```
+</CodeGroup>

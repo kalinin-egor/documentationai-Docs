@@ -16,7 +16,7 @@
         "icon": "book",
         "dropdowns": [
           {
-            "dropdown": "Python SDK",
+            "dropdown": "Platform",
             "groups": [
               {
                 "group": "Getting Started",
@@ -66,33 +66,69 @@
                 ]
               },
               {
-                "group": "Platform",
+                "group": "LLM & Media API",
+                "icon": "message-circle",
+                "pages": [
+                  {
+                    "title": "Overview",
+                    "path": "llm",
+                    "icon": "home"
+                  },
+                  {
+                    "title": "Models & pricing",
+                    "path": "llm/models",
+                    "icon": "tag"
+                  },
+                  {
+                    "title": "Chat & completions",
+                    "path": "llm/chat",
+                    "icon": "message-circle"
+                  },
+                  {
+                    "title": "OpenAI & Anthropic compatibility",
+                    "path": "llm/openai-compat",
+                    "icon": "plug"
+                  },
+                  {
+                    "title": "Image generation",
+                    "path": "llm/images",
+                    "icon": "image"
+                  },
+                  {
+                    "title": "Video generation",
+                    "path": "llm/video",
+                    "icon": "video"
+                  },
+                  {
+                    "title": "Music & speech",
+                    "path": "llm/audio",
+                    "icon": "music"
+                  },
+                  {
+                    "title": "Topaz upscaling",
+                    "path": "llm/topaz",
+                    "icon": "maximize"
+                  },
+                  {
+                    "title": "Long generations",
+                    "path": "llm/long-generations",
+                    "icon": "align-left"
+                  },
+                  {
+                    "title": "Error reference",
+                    "path": "llm/errors",
+                    "icon": "alert-triangle"
+                  }
+                ]
+              },
+              {
+                "group": "Storage & Account",
                 "icon": "layers",
                 "pages": [
                   {
                     "title": "Volumes",
                     "path": "volumes",
                     "icon": "hard-drive"
-                  },
-                  {
-                    "title": "LLM API",
-                    "path": "llm",
-                    "icon": "message-circle"
-                  },
-                  {
-                    "title": "Topaz Upscaling",
-                    "path": "llm/topaz",
-                    "icon": "image"
-                  },
-                  {
-                    "title": "Long Generations",
-                    "path": "llm/long-generations",
-                    "icon": "align-left"
-                  },
-                  {
-                    "title": "Error Reference",
-                    "path": "llm/errors",
-                    "icon": "alert-triangle"
                   },
                   {
                     "title": "Settings",
