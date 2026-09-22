@@ -81,7 +81,7 @@ while time.time() < deadline:
 ## Parameters
 
 <ParamField body="model" type="string" required>
-  Any image slug from the [catalog](#models-pricing) — the Nano Banana family, `gpt-image-2` and its tiers, `gpt-image-1-5`, `gpt-4o-image`, `grok-4-image`, `flux-2-pro`, `flux-2-flex`, `flux-kontext-pro`, `flux-kontext-max`, `seedream-4`, `seedream-4-5`, `seedream-5-0-lite`, `seedream-5-pro`, `z-image`, `wan-2-7-image`, `wan-2-7-image-pro`, `kling-o1-image`, `kling-o3-image`, or the `mj_*` Midjourney actions. (Topaz upscaling models live on their own surface — see the [Topaz guide](/llm/topaz).)
+  Any image slug from the [catalog](#models-pricing) — the Nano Banana family, `gpt-image-2` and its tiers, `gpt-image-2-5-flare` / `gpt-image-2-5-sunburst` and their tiers, `gpt-image-1-5`, `gpt-4o-image`, `grok-4-image`, `flux-2-pro`, `flux-2-flex`, `flux-kontext-pro`, `flux-kontext-max`, `seedream-4`, `seedream-4-5`, `seedream-5-0-lite`, `seedream-5-pro`, `z-image`, `wan-2-7-image`, `wan-2-7-image-pro`, `kling-o1-image`, `kling-o3-image`, or the `mj_*` Midjourney actions. (Topaz upscaling models live on their own surface — see the [Topaz guide](/llm/topaz).)
 </ParamField>
 
 <ParamField body="prompt" type="string" required>
@@ -117,6 +117,7 @@ while time.time() < deadline:
   | `nano-banana` | `1:1` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `9:16` `16:9` `21:9` |
   | `nano-banana-2`, `nano-banana-pro`, `nano-banana-pro-4k` | `auto` + the ratios above |
   | `gpt-image-2` (and the `-2k` / `-4k` tiers) | `auto` + the ratios above; exact `WIDTHxHEIGHT` on the 2K/4K tiers. 4K needs a non-square shape |
+  | `gpt-image-2-5-flare` / `-sunburst` (and their `-2k` / `-4k` tiers) | the ratios above plus `27:16`, `16:27`, `9:8`, `8:9` — those four on the base (1K) SKU only. 4K needs a non-square shape |
   | `gpt-image-1-5` | `1024x1024`, `1024x1536`, `1536x1024` — **no 2K/4K tier exists for this model** |
   | `gpt-4o-image` | `1:1` `2:3` `3:2` |
   | `flux-2-pro`, `flux-2-flex` | `auto` `1:1` `4:3` `3:4` `16:9` `9:16` `3:2` `2:3` |
@@ -209,6 +210,12 @@ Image models are billed per returned image, not per token.
 | GPT Image 2 | `gpt-image-2` | $0.0464 | OpenAI image, 1K tier (higher `size` auto-upgrades, see below) |
 | GPT Image 2 · 2K | `gpt-image-2-2k` | $0.07 | 2K tier — also reached by `size` up to 2048px |
 | GPT Image 2 · 4K | `gpt-image-2-4k` | $0.11 | 4K tier — also reached by `size` above 2048px |
+| GPT Image 2.5 Flare | `gpt-image-2-5-flare` | $0.0464 | OpenAI GPT Image 2.5, lower-latency variant — 1K tier (higher `size` auto-upgrades) |
+| GPT Image 2.5 Flare · 2K | `gpt-image-2-5-flare-2k` | $0.07 | 2K tier — also reached by `size` up to 2048px |
+| GPT Image 2.5 Flare · 4K | `gpt-image-2-5-flare-4k` | $0.11 | 4K tier — also reached by `size` above 2048px |
+| GPT Image 2.5 Sunburst | `gpt-image-2-5-sunburst` | $0.0464 | GPT Image 2.5, premium variant — 1K tier (higher `size` auto-upgrades) |
+| GPT Image 2.5 Sunburst · 2K | `gpt-image-2-5-sunburst-2k` | $0.07 | 2K tier — also reached by `size` up to 2048px |
+| GPT Image 2.5 Sunburst · 4K | `gpt-image-2-5-sunburst-4k` | $0.11 | 4K tier — also reached by `size` above 2048px |
 | GPT Image 1.5 | `gpt-image-1-5` | $0.020 | OpenAI image (cheaper tier) |
 | GPT-4o Image | `gpt-4o-image` | $0.040 | OpenAI 4o image |
 | FLUX.2 Pro | `flux-2-pro` | $0.060 | Black Forest Labs FLUX.2 Pro 1K |
@@ -228,7 +235,7 @@ Image models are billed per returned image, not per token.
 | Midjourney Upscale | `mj_upscale` | $0.10 | Presses one frame's U-button — see the note below |
 | Midjourney Variation | `mj_variation` | $0.16 | Four new concepts derived from one frame |
 
-**How `size` picks the GPT Image 2 tier (and the price).** The `size`
+**How `size` picks the GPT Image 2 / 2.5 tier (and the price).** The `size`
 field accepts `WIDTHxHEIGHT` or a bare `1k` / `2k` / `4k`. The tier is
 chosen by a *ceiling* rule on the long side — the delivered image is
 never smaller than the ask: up to 1024px → base `gpt-image-2`

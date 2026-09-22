@@ -7,6 +7,25 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-09-22" description="GPT Image 2.5 (Flare and Sunburst) in the image catalog" tags={["feature", "images"]}>
+
+## GPT Image 2.5
+
+OpenAI's GPT Image 2.5 is now served on `/v1/llm/images` and
+`/v1/llm/images/jobs`, in both variants: `gpt-image-2-5-flare` (lower
+latency, the default choice) and `gpt-image-2-5-sunburst` (premium
+workflows). Each carries the same 1K / 2K / 4K ladder as GPT Image 2 —
+`gpt-image-2-5-flare-2k`, `-4k`, and the matching Sunburst SKUs — and
+the same `size` ceiling rule picks the tier and the price for you.
+
+**Pricing is unchanged from GPT Image 2**: $0.0464 at 1K, $0.07 at 2K,
+$0.11 at 4K, per image. Reference images ride in `input_images` as
+usual (up to 16 upstream), and both variants accept four extra narrow
+aspect ratios — `27:16`, `16:27`, `9:8`, `8:9` — on the base 1K SKU
+only.
+
+</Update>
+
 <Update label="2026-09-16" description="Video: pick the container and encoder quality; bitrate questions answered" tags={["feature", "video"]}>
 
 ## `output_format` and `output_quality` on video jobs
