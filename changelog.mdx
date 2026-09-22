@@ -7,6 +7,27 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-09-22" description="output_quality on video jobs is now ignored" tags={["fix", "video"]}>
+
+## `output_quality` is no longer applied
+
+The encoder-quality field introduced on 2026-09-16 is now **accepted but
+inert**. Nothing breaks if you keep sending it — it simply has no effect
+on the render, and the kickoff receipt says so in `inputs.notes`.
+
+Why: each model is served by several routes, and only one of them can set
+an encoder quality at all. Honouring the field meant dropping every route
+that cannot — and on some model + aspect-ratio combinations that left no
+route at all, so the job failed to start with a "no available upstream"
+error that pointed at us rather than at the parameter. Clips now render at
+the upstream default of `95`, which was already the top of the visually
+lossless range, so output quality is unchanged in practice.
+
+`output_format` (`mp4` / `mov` / `webm`) is unaffected and still routes
+the job to a provider that can deliver the container you asked for.
+
+</Update>
+
 <Update label="2026-09-22" description="GPT Image 2.5 (Flare and Sunburst) in the image catalog" tags={["feature", "images"]}>
 
 ## GPT Image 2.5
