@@ -26,7 +26,8 @@ curl https://api.gpuniq.com/v1/openai/models \
 
 `GET /v1/llm/models/catalog` is public and needs no key. It is the only
 authoritative price list — the model cards in [/chat](https://gpuniq.com/chat)
-read from it too.
+read from it too. The same list priced in rubles is at
+[`GET /v1/llm/models/catalog/rub`](#prices-in-rubles).
 
 <Callout kind="info">
   **This page no longer prints per-token price tables.** They went stale
@@ -67,6 +68,107 @@ used when a chat request omits `model`.
   entries still advertise resolutions and reference caps that the request
   validator refuses — `seedance-2-5` renders 480p/720p only, and Veo 3.1
   accepts durations of 4, 6 or 8 seconds, not 5.
+</Callout>
+
+## Prices in rubles
+
+`GET /v1/llm/models/catalog/rub` returns the same catalog with every price
+converted to rubles. Like the USD catalog it is public; call it with your key
+and your account discounts are applied, exactly as in the USD version.
+
+<CodeGroup>
+```bash cURL
+curl https://api.gpuniq.com/v1/llm/models/catalog/rub \
+  -H "X-API-Key: gpuniq_your_key"
+```
+
+```python Python
+import requests
+
+catalog = requests.get(
+    "https://api.gpuniq.com/v1/llm/models/catalog/rub",
+    headers={"X-API-Key": "gpuniq_your_key"},
+).json()["data"]
+
+print(f"Rate: {catalog['usd_to_rub']} ₽ per $1")
+for model in catalog["models"]:
+    print(model["slug"], model["retail_input_rub_per_mtok"])
+```
+</CodeGroup>
+
+The key is optional — without it you get the public prices.
+
+### What changes compared to the USD catalog
+
+Rows, their order and every non-price field (`slug`, `media_kind`,
+`capabilities`, discounts, throughput, …) are identical. Each price field
+swaps `usd` for `rub` in its name and holds the ruble amount:
+
+| USD catalog | Ruble catalog |
+|-------------|---------------|
+| `retail_input_usd_per_mtok`, `retail_output_usd_per_mtok` | `retail_input_rub_per_mtok`, `retail_output_rub_per_mtok` |
+| `retail_usd_per_mtok` | `retail_rub_per_mtok` |
+| `retail_usd_per_image` | `retail_rub_per_image` |
+| `retail_usd_per_unit` | `retail_rub_per_unit` |
+| `official_usd_per_unit` | `official_rub_per_unit` |
+| `usd_per_credit` | `rub_per_credit` |
+| `base_usd_per_mtok` (top level) | `base_rub_per_mtok` |
+
+`external_models` is converted the same way. Two fields are added at the top
+level:
+
+| Field | What it tells you |
+|-------|-------------------|
+| `currency` | Always `"RUB"`. |
+| `usd_to_rub` | The rate used for the conversion, rubles per $1. |
+
+A price that is `null` in the USD catalog stays `null`. Amounts are rounded to
+four decimal places: per-second and per-character media rates are fractions
+of a kopeck.
+
+```json
+{
+  "exception": 0,
+  "message": "Каталог моделей в рублях получен",
+  "data": {
+    "currency": "RUB",
+    "usd_to_rub": 96.8427,
+    "default_model": "claude-haiku-4-5",
+    "base_rub_per_mtok": 145.264,
+    "models": [
+      {
+        "slug": "deepseek-v3.2",
+        "media_kind": "text",
+        "retail_input_rub_per_mtok": 19.5235,
+        "retail_output_rub_per_mtok": 29.2852,
+        "retail_rub_per_image": null,
+        "discount_percent_label": 30,
+        "user_discount_percent": 0
+      },
+      …
+    ],
+    "external_models": [ … ]
+  }
+}
+```
+
+Rows are trimmed to a few fields here, and the figures are illustrative —
+read current prices from the endpoint. Multiplying any USD price by
+`usd_to_rub` gives exactly the ruble figure in the row.
+
+### Which rate is used
+
+`usd_to_rub` is the rate at which a ruble top-up is credited to your balance
+today — the same `RUB` figure that `GET /v1/currency/rates` returns. A price in
+this catalog is therefore the number of rubles you need to top up to pay for
+it at today's rate. The rate refreshes several times a day.
+
+<Callout kind="warning">
+  **The balance is still charged in USD.** The ruble catalog is a view of the
+  USD one: the model's USD price does not change, but its ruble figure moves
+  with the rate between requests. Receipts (`cost_usd`) and your balance stay
+  in dollars. If your account tops up by invoice at a rate agreed in your
+  contract, multiply the USD catalog by that rate instead.
 </Callout>
 
 ## Text & reasoning models
