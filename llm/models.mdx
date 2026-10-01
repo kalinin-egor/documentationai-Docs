@@ -66,7 +66,9 @@ used when a chat request omits `model`.
   For video models, treat `capabilities` as a hint and the
   [video request reference](/llm/video#request-body) as the contract. A few
   entries still advertise resolutions and reference caps that the request
-  validator refuses — `seedance-2-5` renders 480p/720p only, and Veo 3.1
+  validator refuses — `seedance-2-5` lists `1080p` / `4k`, but a direct
+  render takes 480p/720p only (1080p comes as the
+  [final of a 480p draft](/llm/video#1080p-on-seedance-25-draft-final)), and Veo 3.1
   accepts durations of 4, 6 or 8 seconds, not 5.
 </Callout>
 

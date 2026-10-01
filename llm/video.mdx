@@ -82,7 +82,7 @@ while time.time() < deadline:
 | `reference_image_urls` | array | no | Seedance 2 line, Kling O3 and Veo 3.1 fast/lite — https URLs / data URIs of subject or style reference images (JPG/PNG/WebP). Up to **30** on `seedance-2-5`, **9** on the rest of the Seedance 2 line, 4 on Kling O3, 3 on Veo 3.1 fast/lite. Switches the job to reference-to-video mode. |
 | `audio_url` | string | no | Seedance 2 line only — reference audio track (MP3/WAV). Requires at least one image or video reference in the same request. |
 | `audio_urls` | array | no | Seedance 2 line only — up to **10** tracks ≤30 s combined on `seedance-2-5`, up to 3 tracks ≤15 s combined elsewhere; merged with `audio_url`. |
-| `resolution` | string | no | Seedance 2: `480p` / `720p` (default) / `1080p` / `4k`, priced per second per resolution. `seedance-2-5` / `-fast` / `-mini`: `480p` / `720p` (default) **only**. Kling 3.0 / O3: `720p` / `1080p` (default) / `4k`. Kling 2.6 / 3.0 **Motion Control**: `720p` / `1080p` (default). Veo 3.1: `720p` / `1080p` / `4k`. Kling 2.1 / 2.5 Turbo Pro: `1080p` only. **Default is `1080p` for every Kling/Veo SKU when the field is omitted** — the Seedance 2 line is the exception at `720p`. |
+| `resolution` | string | no | Seedance 2: `480p` / `720p` (default) / `1080p` / `4k`, priced per second per resolution. `seedance-2-5`: `480p` / `720p` (default) on a direct render; **1080p** is reached as the final of a 480p draft — see [1080p on Seedance 2.5](#1080p-on-seedance-25-draft-final). `-fast` / `-mini`: `480p` / `720p` (default) **only**. Kling 3.0 / O3: `720p` / `1080p` (default) / `4k`. Kling 2.6 / 3.0 **Motion Control**: `720p` / `1080p` (default). Veo 3.1: `720p` / `1080p` / `4k`. Kling 2.1 / 2.5 Turbo Pro: `1080p` only. **Default is `1080p` for every Kling/Veo SKU when the field is omitted** — the Seedance 2 line is the exception at `720p`. |
 | `audio` | bool | no | Default `false`. Kling 2.6 / 3.0 double the price when `true`; on the Seedance 2 line it generates the clip's audio track (no surcharge). |
 | `mode` | string | no | `standard` / `pro` (default) / `master` for Kling 2.1; `turbo` for 2.5 Turbo Pro. |
 | `character_orientation` | string | no | Kling 2.6 / 3.0 **Motion Control** only. `video` (default) — the output follows the reference clip's framing, clip up to 30s; `image` — the output follows the character image, clip up to 10s. Other models ignore it. |
@@ -326,7 +326,7 @@ flat rate. The exact amount charged is always in the completion response's
 | Seedance 1.0 Pro | `seedance-1-0-pro` | $0.210 | ByteDance 720p, 5s, t2v + i2v (per video) |
 | Seedance 1.5 Pro | `seedance-1-5-pro` | $0.160 | ByteDance 720p, 5s, t2v + i2v (per video) |
 | Seedance 2 | `seedance-2` | $0.122–$1.40 / s | ByteDance 480p–4k, **billed per second, rate depends on resolution** (720p: $0.272/s, 5s ≈ $1.36) |
-| Seedance 2.5 | `seedance-2-5` | $0.198–$0.426 / s | ByteDance **480p / 720p only**, 4–30s, **billed per second** (720p: $0.426/s, 5s ≈ $2.13); first/last frame, reference images + video + audio |
+| Seedance 2.5 | `seedance-2-5` | $0.198–$0.80 / s | ByteDance 480p / 720p, **1080p via a 480p draft → final**, 4–30s, **billed per second** (720p: $0.426/s, 5s ≈ $2.13); first/last frame, reference images + video + audio |
 | Seedance 2 Fast | `seedance-2-fast` | $0.13–$0.27 / s | Faster, cheaper Seedance 2 line — 480p / 720p, 4–15s, billed per second |
 | Seedance 2 Mini | `seedance-2-mini` | $0.08–$0.17 / s | Smallest Seedance 2 line — 480p / 720p, 4–15s, billed per second |
 | Alibaba Wan 2.2 Fast | `wan-2-2-fast` | $0.120 | 720p fast tier |
@@ -418,7 +418,7 @@ budgeting a batch.
 | `seedance-1-0-pro` | Seedance 1.0 Pro | 720p | 5s | t2v, i2v | **Flat $0.210 / video** |
 | `seedance-1-5-pro` | Seedance 1.5 Pro | 720p | 5s | t2v, i2v | **Flat $0.160 / video** |
 | `seedance-2` | Seedance 2 | 480p / 720p / 1080p / 4k | 4–15s (5) | t2v, i2v, first/last-frame, ref-to-video (image + video + audio refs) | **Per second, by resolution — see below** |
-| `seedance-2-5` | Seedance 2.5 | **480p / 720p only** | **4–30s** (5) | t2v, i2v, first/last-frame, ref-to-video (image + video + audio refs) | **Per second, by resolution — see below** |
+| `seedance-2-5` | Seedance 2.5 | 480p / 720p; **1080p via [draft → final](#1080p-on-seedance-25-draft-final)** | **4–30s** (5) | t2v, i2v, first/last-frame, ref-to-video (image + video + audio refs) | **Per second, by resolution — see below** |
 | `seedance-2-fast` | Seedance 2 Fast | 480p / 720p | 4–15s (5) | t2v, i2v, first/last-frame, ref-to-video | **Per second, by resolution** |
 | `seedance-2-mini` | Seedance 2 Mini | 480p / 720p | 4–15s (5) | t2v, i2v, first/last-frame, ref-to-video | **Per second, by resolution** |
 
@@ -435,12 +435,17 @@ budgeting a batch.
   | `1080p` | $0.612 | $0.368 |
   | `4k` | $1.40 | $0.84 |
 
-  `seedance-2-5` (no 1080p / 4k tier upstream):
+  `seedance-2-5`:
 
   | Resolution | $/second | $/second with reference video(s) |
   |------------|----------|----------------------------------|
   | `480p` | $0.198 | $0.119 |
   | `720p` (default) | $0.426 | $0.255 |
+  | `1080p` — final of a 480p draft only | $0.80 | — (one rate, billed on the draft's duration) |
+
+  A 1080p clip on `seedance-2-5` is two jobs, and you pay for both:
+  the 480p draft, then the 1080p final — $0.198 + $0.80 = **$0.998 per
+  second** of video at list price. There is no 4k on this SKU.
 
   `seedance-2-fast` / `seedance-2-mini`:
 
@@ -477,8 +482,9 @@ budgeting a batch.
   menu (up to 4k). Priced per second, so it scales with clip length.
 - **`seedance-2-5`** — the newest ByteDance line and the flagship of the
   family. Best motion coherence and the only SKU that renders up to
-  **30 seconds** in one job, but it renders **480p / 720p only** and is
-  the most expensive per second. Reach for it when quality and clip
+  **30 seconds** in one job. It renders 480p / 720p directly; 1080p
+  comes as a [final of a 480p draft](#1080p-on-seedance-25-draft-final)
+  (two jobs, ≈ $1/s together). It is the most expensive SKU per second. Reach for it when quality and clip
   length matter more than cost.
 - **`seedance-2-fast` / `seedance-2-mini`** — the same Seedance 2
   grammar at a fraction of the price (480p / 720p, 4–15s). Use them for
@@ -548,9 +554,11 @@ i2v it supports:
   — when any reference input is attached, `last_frame_url` is dropped.
 - **Resolution choice** — via `resolution`; the per-second price scales
   with it (see the pricing tables above). The menu is per SKU:
-  `seedance-2` renders `480p` / `720p` / `1080p` / `4k`, while
-  `seedance-2-5`, `-fast` and `-mini` render `480p` / `720p` only and
-  return a 400 for anything above.
+  `seedance-2` renders `480p` / `720p` / `1080p` / `4k`;
+  `seedance-2-5` renders `480p` / `720p` directly and `1080p` only as
+  the [final of a 480p draft](#1080p-on-seedance-25-draft-final);
+  `-fast` and `-mini` render `480p` / `720p` only. A direct request
+  above the menu is a 400.
 - **Generated audio track** — set `audio: true` to have the model
   generate sound for the clip. Default is `false`; we always send the
   flag explicitly, so an omitted field means a silent clip.
@@ -618,7 +626,7 @@ field; it is also listed by `GET /v1/llm/models/catalog`).
 | `model` | string | `"seedance-2-5"` — required | — |
 | `prompt` | string | required, 1–10 000 characters | — |
 | `duration` | int | **any integer 4–30** (seconds) | `5` |
-| `resolution` | string | **`480p` or `720p` only** — `1080p` / `4k` are a 400 on this SKU | `720p` |
+| `resolution` | string | **`480p` or `720p`** — a direct `1080p` / `4k` is a 400; 1080p comes from [`/final` on a 480p draft](#1080p-on-seedance-25-draft-final) | `720p` |
 | `aspect_ratio` | string | `16:9`, `9:16`, `1:1`, `auto`, `21:9`, `4:3`, `3:4` | `16:9` (`auto` follows the input frames) |
 | `image_url` | string | https URL or `data:` URI — **start frame** (i2v) | — |
 | `last_frame_url` | string | https URL or `data:` URI — **end frame**; requires `image_url` | — |
@@ -758,6 +766,7 @@ The adjacent post-processing surface is Topaz video upscaling
 |------------|----------|-------------------------------------|
 | `480p` | $0.198 | $0.119 |
 | `720p` (default) | $0.426 | $0.255 |
+| `1080p` — [final of a 480p draft](#1080p-on-seedance-25-draft-final) | $0.80 | — |
 
 Billed per second of output, i.e. `rate × duration`. In
 reference-to-video mode the upstream meters `(input + output)` seconds,
@@ -774,6 +783,8 @@ Worked examples:
 - 10 s, 480p, t2v → 10 × $0.198 = **$1.98**
 - 8 s, 720p, ref-to-video with a 6 s clip → estimated
   (8 + 30) × $0.255 = **$9.69**, billed (8 + 6) × $0.255 = **$3.57**
+- 30 s, 1080p → 480p draft 30 × $0.198 = $5.94, then the final
+  30 × $0.80 = $24.00 — **$29.94** for both jobs
 
 **Example request**
 
@@ -821,3 +832,103 @@ curl -X POST https://api.gpuniq.com/v1/llm/videos/jobs \
   -d '{"model":"seedance-2-5","prompt":"a paper boat drifting down a rain gutter"}'
 ```
 
+<div id="1080p-on-seedance-25-draft-final" />
+
+#### 1080p on Seedance 2.5 — draft, then final
+
+`seedance-2-5` has no direct 1080p render: `"resolution": "1080p"` on
+`POST /v1/llm/videos/jobs` is a 400. 1080p on this model goes through
+ByteDance's Draft Mode instead: you render the shot at 480p, check it,
+and then render **the same shot** at 1080p. On the API that is two
+calls.
+
+**1. Render the 480p draft.** An ordinary job with `"model":
+"seedance-2-5"` and `"resolution": "480p"`; there is no draft flag to
+set. A fresh 480p render on this SKU is kept as a draft automatically.
+It is billed like any 480p clip ($0.198/s) and it is a normal 480p
+video, not a degraded preview.
+
+**2. Read `data.draft` in the completed poll.** A job that was kept as
+a draft carries the offer for its final:
+
+```jsonc
+// GET /v1/llm/videos/jobs/vid_3f1c0b5e2a7d4c8e9f01 — a completed 480p draft
+{
+  "status": "completed",
+  "job_id": "vid_3f1c0b5e2a7d4c8e9f01",
+  "model": "seedance-2-5",
+  "video": { "url": "https://.../draft.mp4", "stored_url": "https://api.gpuniq.com/v1/llm/media/....mp4" },
+  "cost_usd": 5.94,
+  "draft": {
+    "final_available": true,
+    "final_resolution": "1080p",
+    "final_estimated_cost_usd": 24.0,
+    "expires_at": "2026-10-08T08:12:40+00:00",
+    "final_endpoint": "/v1/llm/videos/jobs/vid_3f1c0b5e2a7d4c8e9f01/final"
+  }
+}
+```
+
+`final_estimated_cost_usd` is already **your** price for the final,
+after your personal discount.
+
+**3. Render the final.** `POST` to `final_endpoint` with **no body**:
+
+```bash
+curl -X POST https://api.gpuniq.com/v1/llm/videos/jobs/vid_3f1c0b5e2a7d4c8e9f01/final \
+  -H "X-API-Key: gpuniq_your_key"
+
+# → {"exception":0,"data":{"job_id":"vid_9a07d2c4e6b84f13a5c7","status":"pending",
+#                          "model":"seedance-2-5","resolution":"1080p",
+#                          "final_of":"vid_3f1c0b5e2a7d4c8e9f01","estimated_cost_usd":24.0}}
+```
+
+The answer is a **new** `job_id`. Poll it at
+`GET /v1/llm/videos/jobs/{job_id}` like any other video job. It is
+charged on delivery at the 1080p rate, $0.80/s at list price. In the web
+chat's video panel the same action is the **1080p · $X** button next to
+Download.
+
+**What the final keeps.** Prompt, duration, aspect ratio, container,
+generated audio and every reference input come from the draft, which is
+why the call takes no body and nothing in it can be changed. Composition,
+subject, motion and timing match the draft. Fine detail can differ a
+little: the final is a new render at the higher resolution, not an
+upscale of the draft file.
+
+**Rules**
+
+- The final can be requested for **7 days** after the draft
+  (`expires_at`).
+- Drafts exist only for `seedance-2-5` at `480p`. A 720p job, an
+  edit/extend job (`video_task`) and every other model have no draft.
+- No `draft` block in a completed 480p job means the clip was rendered
+  on a route that cannot keep a draft (for example after an internal
+  fallback). That clip has no 1080p final. Render a new 480p job.
+- Only the account that rendered the draft can finalise it.
+- The final runs on the one upstream that holds the draft, so unlike a
+  normal job it has no provider failover.
+
+**Errors on `/final`.** As everywhere on the native API, they arrive as
+an envelope with a non-zero `exception`, so branch on
+`body["exception"]`, not on the HTTP status:
+
+| `error_code` | `exception` | Meaning |
+|--------------|-------------|---------|
+| `invalid_request` | 400 | No draft for this job: another model or resolution, a render kept without a draft, someone else's job, or older than 7 days. |
+| `insufficient_balance` | 402 | Top up and call `/final` again; the draft stays valid until `expires_at`. |
+| `no_provider_available` | 400 | The final isn't available at your current price. Contact support. |
+| `provider_unavailable` | 503 | Temporary. Retry with backoff. |
+
+**Cost of a 1080p clip = draft + final**, at list price:
+
+| Duration | 480p draft ($0.198/s) | 1080p final ($0.80/s) | Total |
+|----------|-----------------------|-----------------------|-------|
+| 5 s | $0.99 | $4.00 | **$4.99** |
+| 10 s | $1.98 | $8.00 | **$9.98** |
+| 30 s | $5.94 | $24.00 | **$29.94** |
+
+A draft rendered in reference-to-video mode bills at the reference rate
+(see above); the final always bills its output seconds at the 1080p rate.
+Personal discounts apply to each job separately; the final uses your
+1080p discount when you have one.

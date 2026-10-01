@@ -7,6 +7,22 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-09-30" description="Seedance 2.5 in 1080p: render a 480p draft, then its final" tags={["feature", "video"]}>
+
+## 1080p on `seedance-2-5`
+
+Seedance 2.5 now goes up to 1080p. A 480p render on `seedance-2-5` is
+kept as a draft, and its completed poll carries a `draft` block with
+the price of the final. `POST /v1/llm/videos/jobs/{job_id}/final` (no
+body) then renders the same shot at 1080p as a new job: same prompt,
+duration, references and audio. The draft stays finalisable for 7 days.
+
+The final costs $0.80 per second at list price, on top of the draft's
+$0.198 per second. A direct `"resolution": "1080p"` on this SKU is still
+a 400. Full contract: [1080p on Seedance 2.5](/llm/video#1080p-on-seedance-25-draft-final).
+
+</Update>
+
 <Update label="2026-09-22" description="output_quality on video jobs is now ignored" tags={["fix", "video"]}>
 
 ## `output_quality` is no longer applied
