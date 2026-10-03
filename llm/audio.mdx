@@ -109,8 +109,10 @@ while time.time() < deadline:
 <Callout kind="warning">
   **Give the poll loop a generous budget.** Music renders are slower than
   image renders, and abandoning the loop early costs you a render you would
-  otherwise have received. The job record lives for **60 minutes**; after that
-  a poll returns `job_not_found`.
+  otherwise have received. The job record lives for **60 minutes** and the
+  terminal payload is replayed to every poll in that window — you are charged
+  once, on the first poll that returned the result. After that a poll returns
+  `job_not_found`.
 </Callout>
 
 ## Speech, dialogue, sound effects & isolation
@@ -141,7 +143,7 @@ took effect.
 | Field | Type | Notes |
 |-------|------|-------|
 | `text` | string | ≤ **5000 characters**. Longer is an HTTP 400 `invalid_request` with the limit in `data.meta.fields` — never a truncated read. |
-| `voice` | string | ElevenLabs voice id. Omit for a stock voice. |
+| `voice` | string | ElevenLabs voice id. Omit for the stock voice `21m00Tcm4TlvDq8ikWAM` (Rachel). |
 | `stability`, `similarity_boost`, `style` | float | `0.0`–`1.0` prosody controls. |
 | `speed` | float | `0.7`–`1.2`. |
 | `language_code` | string | ISO 639-1, to force a language the text is ambiguous about. |
@@ -208,6 +210,10 @@ known at submit. Those gate your balance against a conservative assumption
 (**30 s** for a sound effect, **600 s** for an isolation job) and the precise
 charge lands at completion, recovered from the upstream's own metering. A job
 that turns out shorter settles well under its estimate.
+
+`POST /v1/llm/audio/jobs/estimate` and `POST /v1/llm/music/jobs/estimate`
+return that estimate (and your discounted price) for the kickoff body without
+starting the job.
 
 ## Where the delivered media lives
 

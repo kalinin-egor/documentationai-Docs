@@ -1,6 +1,6 @@
 ---
 title: Long generations
-description: Streaming, job-based polling, and the 4096-token non-streaming limit — how to make GPUniq generate 5000 to 100,000 tokens reliably without hitting the edge-proxy timeout.
+description: Streaming, job-based polling, and the keep-alive path for long non-streaming requests — how to make GPUniq generate 5000 to 100,000 tokens reliably without hitting the edge-proxy timeout.
 ---
 
 The edge proxy in front of GPUniq closes inbound connections after roughly **100 seconds of streaming silence**. That's plenty for a typical chat reply (1-30 s), but Claude / GPT-5 / Gemini Pro turning out 5K+ tokens of free-form prose can take **2-4 minutes** and run into the cap mid-generation. Symptoms:
@@ -17,7 +17,7 @@ The edge proxy in front of GPUniq closes inbound connections after roughly **100
 | > 4096 output tokens **OR** slow / reasoning model | **Set `"stream": true`**. |
 | Client can't speak SSE | Use [`POST /v1/llm/chat/jobs`](#3-job-based-long-poll-api) (long-poll pattern). |
 
-A non-streaming request with `max_tokens > 4096` is **rejected up-front** with HTTP 400 `streaming_required` — the buffered response would lose to the 100-second cap, so we fail fast instead of burning the upstream call. See [errors](/llm/errors#streaming) for the error envelope shape.
+A non-streaming request with `max_tokens > 4096` is served through a **keep-alive path** (section 2): it is not refused, but it ties up a connection for the whole generation and reports upstream failures inside a 200. Streaming is still the recommended shape.
 
 ## 1. Recommended: streaming
 
@@ -58,31 +58,28 @@ curl -N -X POST https://api.gpuniq.com/v1/openai/chat/completions \
 
 Failover within a streaming request is best-effort: once the first byte ships to your client, the upstream is final. If the upstream then dies, the SSE stream emits a final `data: {"error": {…}}` chunk followed by `data: [DONE]`. Treat that as a partial-success — see [errors / streaming error chunks](/llm/errors#streaming-error-chunks-in-the-middle-of-an-sse-stream).
 
-## 2. Hard limit: non-streaming requests are capped at 4096 output tokens
+## 2. Long non-streaming requests: the keep-alive path
 
-A non-streaming request with `max_tokens > 4096` is **rejected up-front** with HTTP 400:
+A non-streaming request with `max_tokens > 4096` is accepted. GPUniq opens a
+stream to the upstream, assembles the reply itself and, while that runs,
+flushes whitespace keep-alive bytes to your connection every few seconds so
+no proxy on the way sees an idle socket. The final JSON is a normal
+`chat.completion` object. Two things to know:
 
-```jsonc
-{
-  "error": {
-    "message": "Requested max_tokens=8000 exceeds the non-streaming limit of 4096. Long responses must use streaming: resend the request with \"stream\": true.",
-    "type": "invalid_request_error",
-    "code": "streaming_required",
-    "doc_url": "https://docs.gpuniq.com/llm/long-generations",
-    "meta": { "max_tokens": 8000, "limit": 4096, "hint": "stream=true" }
-  },
-  "status_code": 400,
-  "request_id": "…"
-}
-```
+- The response carries `X-GPUniq-Long-Generation: keepalive` and arrives with
+  `Transfer-Encoding: chunked`; any HTTP client that reads the body to the end
+  handles it, but a client that parses the first bytes as JSON will see
+  whitespace first.
+- An upstream failure on this path cannot change the status line any more —
+  it arrives as HTTP **200** whose body is `{"error": {"message", "type",
+  "code"}}`. Branch on the presence of `error` before reading `choices`.
 
-This is intentional. Buffered (non-stream) responses past ~3000 output tokens run unacceptably close to the 100-second edge-proxy cap and routinely truncate client-side. Failing fast with a clear `streaming_required` code is more honest than burning the upstream call and returning a half-cooked JSON.
+The `streaming_required` 400 that used to guard this limit is retired; no
+request is refused for its `max_tokens` alone.
 
-Earlier deployments silently upgraded the upstream call to streaming and reassembled the SSE chunks. That worked for SDKs but ate connections on every Cloudflare-fronted client (browsers, mobile, behind corporate proxies), and was opaque when it broke. **Hard reject with a structured error is the new contract.**
+### Still prefer streaming
 
-### Migration
-
-If your integration depended on `max_tokens > 4096` without streaming:
+If your integration asks for `max_tokens > 4096` without streaming:
 
 ```python
 # Before — would 524 mid-generation or get truncated

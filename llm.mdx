@@ -121,7 +121,7 @@ its keys. The Python SDK retries automatically when it hits the limit.
 
 ## Long generations & streaming
 
-The edge proxy closes inbound connections after ~100 seconds of streaming silence. A non-streaming request asking for `max_tokens > 4096` is **rejected up-front** with HTTP 400 `streaming_required` — buffered responses past that length routinely lose to the cap. For long replies, set `"stream": true` or use the job-based long-poll API.
+The edge proxy closes inbound connections after ~100 seconds of streaming silence. A non-streaming request asking for `max_tokens > 4096` is **not refused**: GPUniq streams from the upstream and assembles the reply itself, flushing whitespace keep-alive bytes to you until the final JSON is ready (the response carries `X-GPUniq-Long-Generation: keepalive`). On that path an upstream failure arrives as HTTP 200 whose body is `{"error": …}` — check for it. For long replies, prefer `"stream": true` or the job-based long-poll API.
 
 | Your request | What to do |
 |---|---|
@@ -136,16 +136,14 @@ full streaming / job-based / reasoning-token recipe.
 
 ## Errors
 
-Every failure returns a stable OpenAI error envelope with a structured `code` you can branch on — `streaming_required`, `insufficient_balance`, `model_not_found`, `rate_limit_per_key`, etc. See the [Error reference](/llm/errors) for the complete catalog, recovery strategies, and the native vs. OpenAI-compat envelope shapes.
+Every failure returns a stable OpenAI error envelope with a structured `code` you can branch on — `insufficient_balance`, `model_not_found`, `rate_limit_per_key`, `provider_unavailable`, etc. See the [Error reference](/llm/errors) for the complete catalog, recovery strategies, and the native vs. OpenAI-compat envelope shapes.
 
 ```jsonc
 {
   "error": {
-    "message": "…human-readable description…",
+    "message": "Unknown model 'gpt-9'. Fetch /v1/openai/models for the current catalog.",
     "type": "invalid_request_error",
-    "code": "streaming_required",
-    "doc_url": "https://docs.gpuniq.com/llm/long-generations",
-    "meta": { "max_tokens": 8000, "limit": 4096 }
+    "code": "model_not_found"
   },
   "status_code": 400,
   "request_id": "…"

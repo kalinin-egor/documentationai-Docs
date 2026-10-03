@@ -51,16 +51,28 @@ budgeting:
 | `category` | `flagship` / `reasoning` / `balanced` / `fast` — the shelf it sits on. |
 | `media_kind` | `text`, `image`, `video`, `music` or `audio`. Decides which endpoint serves it. |
 | `retail_input_usd_per_mtok`, `retail_output_usd_per_mtok` | Text pricing, USD per million tokens, input and output priced separately. |
-| `retail_usd_per_image` | Flat price per delivered image. |
-| `retail_usd_per_unit` + `video_billing_unit` / `audio_billing_unit` | Media price and the unit it is charged in — `video`, `second` or `character`. |
+| `retail_cached_input_usd_per_mtok` | What cached input costs on the model's primary route, or `null` when no route discounts it. Applied only when the provider that served your call gave GPUniq that discount — see [How pricing works](#how-pricing-works). |
+| `retail_usd_per_image` | Flat price per delivered image. Video and music rows still carry their unit price here for one more release — read `retail_usd_per_unit` for them. |
+| `retail_usd_per_unit` + `video_billing_unit` / `audio_billing_unit` | Media price and the unit it is charged in — `video`, `second`, `track` or `character`. |
+| `pricing` | Structured prices by variant where a table exists: `per_second_usd` by resolution (Seedance, with the reference-to-video rate), `by_resolution_usd` per clip at the model's kickoff defaults (Kling / Veo, spelled out in `assumes`), `by_size_usd` per image tier. `null` for everything else. |
+| `available`, `unavailable_reason` | Whether a live route serves the model right now. `unavailable_reason` is `no_route` (nothing maps the slug) or `all_routes_disabled`. Hide a row with `available: false` — its kickoff would fail. |
+| `aliases` | Other spellings that resolve to this row: the vendor's dotted form (`claude-haiku-4.5`), the aggregator id (`anthropic/claude-haiku-4.5`). A request under any of them is routed and billed as this row. |
 | `discounted`, `discount_percent_label` | Whether this model is sold below vendor list, and by how much. |
 | `user_discount_percent`, `user_tier_discounts` | Your account's own discount, if any, on top of the public one. |
 | `tokens_per_sec`, `tokens_per_sec_approx` | Measured throughput, for picking between models of similar quality. |
 | `credit_metered`, `usd_per_credit` | Set on the Topaz restoration models, which meter in credits. |
-| `capabilities` | Reference-input caps, resolutions, aspect ratios and duration range for media models. |
+| `capabilities` | Reference-input caps, resolutions, aspect ratios and duration range for media models; `context_tokens` and `max_output_tokens` for text models, taken from the vendor's published figures (the hourly OpenRouter record) where available. |
 
 The response also carries `default_model` — currently **`claude-haiku-4-5`**,
 used when a chat request omits `model`.
+
+`external_models` lists OpenRouter ids GPUniq has **no native row for**. An
+id that resolves to a native slug (`anthropic/claude-haiku-4.5`,
+`qwen/qwen3-max`, …) is never listed there: a request under it is routed and
+billed as the native row, and it appears in that row's `aliases`. Routing
+variants (`:batch`, `:free`, `:online`, `:nitro`, …) are not listed either —
+they cannot be called through `chat/completions`; only `:thinking` and
+`:extended`, which are distinct models, stay.
 
 <Callout kind="warning">
   For video models, treat `capabilities` as a hint and the
@@ -112,6 +124,8 @@ swaps `usd` for `rub` in its name and holds the ruble amount:
 | `retail_usd_per_mtok` | `retail_rub_per_mtok` |
 | `retail_usd_per_image` | `retail_rub_per_image` |
 | `retail_usd_per_unit` | `retail_rub_per_unit` |
+| `retail_cached_input_usd_per_mtok` | `retail_cached_input_rub_per_mtok` |
+| `pricing.per_second_usd`, `pricing.by_resolution_usd`, `pricing.by_size_usd` | the same keys with `rub` |
 | `official_usd_per_unit` | `official_rub_per_unit` |
 | `usd_per_credit` | `rub_per_credit` |
 | `base_usd_per_mtok` (top level) | `base_rub_per_mtok` |
@@ -201,16 +215,42 @@ Every surface bills against the same USD balance, but the *unit* differs:
 
 | Media kind | Unit | Charged when |
 |------------|------|--------------|
-| Text | per million tokens, input and output priced separately | On completion. `completion_tokens` includes any hidden reasoning tokens. |
-| Image | flat, per delivered image | When the completion poll returns the image. |
-| Video | per clip, or per second of output — depends on the model | When the completion poll returns `video.url`. |
-| Music | per call (some models return two tracks for it) | When the completion poll returns the tracks. |
-| Speech & audio | per 1000 characters, or per second | On completion. |
-| Topaz restoration | per credit, `$0.14` / credit | On completion. See [Topaz](/llm/topaz#pricing). |
+| Text | per million tokens, input and output priced separately | On completion. `completion_tokens` includes any hidden reasoning tokens. Cached input (`prompt_tokens_details.cached_tokens`) is billed at `retail_cached_input_usd_per_mtok` **only when the provider that served the call gave GPUniq a cache discount**; otherwise as normal input. |
+| Image | flat, per delivered image | Models rendered on GPUniq's own pipeline (most of the catalog): when the render finishes, whether or not you poll. Natively async upstreams (Nano Banana line, `gpt-image-2` family): on the first poll that returns the image. |
+| Video | per clip, or per second of output — depends on the model | On the first poll that returns `video.url`. |
+| Music | per call (some models return two tracks for it) | On the first poll that returns the tracks. |
+| Speech & audio | per 1000 characters, or per second | On the first poll that returns the file. |
+| Topaz restoration | per credit, `$0.14` / credit | On the first poll that returns the result. See [Topaz](/llm/topaz#pricing). |
 
-A failed, refused or timed-out media job costs nothing. For media, the kickoff
-response carries `estimated_cost_usd` and the completion response carries the
-authoritative `cost_usd` and your new `balance_usd`.
+A failed, refused or timed-out media job costs nothing. Every media job is
+charged **once**; the terminal payload is replayed to later polls until the
+job record expires. For media, the kickoff response carries
+`estimated_cost_usd` and the completion response carries the authoritative
+`cost_usd` and your new `balance_usd`.
+
+### Price before you start
+
+`POST /v1/llm/{images,videos,music,audio}/jobs/estimate` take the same body as
+the kickoff and return the price without starting anything:
+
+```jsonc
+// POST /v1/llm/videos/jobs/estimate  {"model": "kling-2-6", "prompt": "…", "resolution": "720p"}
+{
+  "model": "kling-2-6",
+  "estimated_cost_usd": 0.315,      // list price — what the kickoff reports and gates the balance on
+  "discounted_cost_usd": 0.315,     // what this account would be charged
+  "billing_unit": "video",
+  "unit_price_usd": 0.315,
+  "units": 1,
+  "user_discount_percent": 0,
+  "breakdown": { "config": { "resolution": "720p", "audio": false, "duration": 5, "task": "t2v", "mode": null } }
+}
+```
+
+Validation is the kickoff's (`model_not_found`, `invalid_request`,
+`no_provider_available`), minus the balance gate. Per-second audio SKUs quote
+the same duration assumption the kickoff gates on; the charge uses the real
+length.
 
 ### Discounts
 
@@ -271,7 +311,7 @@ for log in history["logs"]:
 
 | Endpoint | Returns |
 |----------|---------|
-| `GET /v1/llm/usage/history` | Per-request log lines, newest first. |
+| `GET /v1/llm/usage/history` | Per-request log lines, newest first. Money is in USD: `cost_usd` per line and `total_cost_usd` in `statistics`. `cost_rub` / `total_cost_rub` are deprecated aliases of the same USD numbers — they never held rubles — and will be removed. |
 | `GET /v1/llm/usage/breakdown` | Daily / weekly aggregates by model. |
 | `GET /v1/llm/usage/requests` | Request-level records, with `GET /v1/llm/usage/requests/{log_id}` for one in full. |
 

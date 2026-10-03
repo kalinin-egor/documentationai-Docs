@@ -77,9 +77,21 @@ print(f"Tokens used: {data['tokens_used']}  cost: ${data['cost_usd']:.6f}")
 </ParamField>
 
 <Callout kind="warning">
-  A non-streaming request asking for `max_tokens > 4096` is rejected up front
-  with `streaming_required`. Set `"stream": true` or use the job-based
-  long-poll API — see [Long generations](/llm/long-generations).
+  A non-streaming request asking for `max_tokens > 4096` is served through an
+  internal keep-alive path rather than refused — but it holds the connection
+  for the whole generation and reports upstream failures inside a 200. Set
+  `"stream": true` or use the job-based long-poll API — see
+  [Long generations](/llm/long-generations).
+</Callout>
+
+<Callout kind="info">
+  **Cached input.** When the provider that served the call gave GPUniq a
+  cache-read discount, the cached part of your prompt
+  (`usage.prompt_tokens_details.cached_tokens`) is billed at the catalog's
+  `retail_cached_input_usd_per_mtok` instead of the input rate. When it did
+  not, cached tokens are billed as normal input — the discount mirrors what
+  GPUniq actually paid, so two identical requests served by different routes
+  can cost differently. `usage.cost` on every response is the amount charged.
 </Callout>
 
 ## Chat sessions

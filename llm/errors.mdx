@@ -87,10 +87,7 @@ try:
     resp = client.chat.completions.create(model=…, messages=…)
 except BadRequestError as e:
     code = e.body.get("error", {}).get("code")
-    if code == "streaming_required":
-        # Retry with stream=true
-        ...
-    elif code == "model_not_found":
+    if code == "model_not_found":
         # Show a "pick a different model" UI
         ...
 except RateLimitError as e:
@@ -117,7 +114,7 @@ The complete list of stable error codes returned by GPUniq.
 
 | `code` | HTTP | OpenAI `type` | When |
 |---|---|---|---|
-| `authentication_required` | 401 | `invalid_request_error` | No `Authorization: Bearer …` header and no `X-API-Key`. |
+| `authentication_required` | 401 | `invalid_request_error` | No `Authorization: Bearer …` header and no `X-API-Key`. Both header styles are accepted on every surface, `/v1/openai/*` included. |
 | `invalid_api_key` | 401 | `invalid_request_error` | The API key is malformed or doesn't exist. |
 | `api_key_revoked` | 401 | `invalid_request_error` | Key existed but was disabled from the dashboard. |
 | `user_not_found` | 404 | `invalid_request_error` | The user account behind this credential no longer exists (rare — only when a credential outlives a hard-delete). |
@@ -131,7 +128,7 @@ The complete list of stable error codes returned by GPUniq.
 | `rate_limit_per_key` | 429 | `rate_limit_exceeded` | One API key exceeded its per-minute window. |
 | `rate_limit_per_user` | 429 | `rate_limit_exceeded` | Your user account exceeded the aggregate per-minute window across **all** your API keys. |
 
-The response carries `Retry-After` (seconds), `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers — the OpenAI SDK consumes these automatically for its built-in backoff. The window is a true sliding 60-second one (Redis ZSET), not a fixed-bucket counter, so the limit can't be bypassed at the minute boundary.
+The 429 carries `Retry-After` (seconds), `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers — the OpenAI SDK consumes these automatically for its built-in backoff. Successful API-key responses carry the three `X-RateLimit-*` headers too, so you can keep headroom before you hit the limit; browser clients can read them (they are CORS-exposed, together with `X-Request-ID`). The window is a true sliding 60-second one (Redis ZSET), not a fixed-bucket counter, so the limit can't be bypassed at the minute boundary.
 
 **Recovery:** Honour `Retry-After`. If you regularly hit `rate_limit_per_key`, the per-key limit is bumpable from the dashboard. If you hit `rate_limit_per_user`, the aggregate cap is bumpable on request — contact support.
 
@@ -165,25 +162,20 @@ The response carries `Retry-After` (seconds), `X-RateLimit-Limit`, `X-RateLimit-
 
 | `code` | HTTP | OpenAI `type` | When |
 |---|---|---|---|
-| `streaming_required` | 400 | `invalid_request_error` | A non-streaming request asked for more than `NON_STREAM_MAX_TOKENS` output tokens (default **4096**). Buffered responses past that length routinely lose to the ~100 s edge-proxy timeout — retry with `stream: true`. The error's `error.meta` carries `max_tokens`, `limit`, and a `hint` field. |
 | `empty_upstream_stream` | 200 (SSE frame) | `api_error` | Every eligible upstream accepted the request and then closed the stream without emitting a single token. Delivered as an SSE error frame followed by `[DONE]`; **nothing is billed**. Retry, or resend with `"stream": false`. |
 
-This is the most common reason a previously-working integration breaks after a GPUniq update. The full recovery recipe lives in the [Long generations](/llm/long-generations) guide.
+An error that reaches you mid-stream — the last upstream failed after the
+stream was already open — is one SSE frame shaped exactly like a
+non-stream error, `data: {"error": {"message", "type", "code"}}`, followed
+by `data: [DONE]`. The `type` / `code` follow the upstream's status
+(`400` → `invalid_request_error` / `invalid_request`, `404` →
+`model_not_found`, `429` → `rate_limit_error` / `rate_limit_exceeded`,
+anything else → `api_error` / `upstream_error`); nothing else from the
+upstream's body is forwarded.
 
-```jsonc
-// Example response on max_tokens=8000 without stream:
-{
-  "error": {
-    "message": "Requested max_tokens=8000 exceeds the non-streaming limit of 4096. Long responses must use streaming: resend the request with \"stream\": true.",
-    "type": "invalid_request_error",
-    "code": "streaming_required",
-    "doc_url": "https://docs.gpuniq.com/llm/long-generations",
-    "meta": { "max_tokens": 8000, "limit": 4096, "hint": "stream=true" }
-  },
-  "status_code": 400,
-  "request_id": "…"
-}
-```
+There is no `streaming_required` error any more: a non-streaming request
+above 4096 output tokens is served through the keep-alive path described in
+[Long generations](/llm/long-generations#2-long-non-streaming-requests-the-keep-alive-path).
 
 ### Provider / upstream
 
@@ -192,7 +184,7 @@ GPUniq routes every chat completion through a cost-sorted fallback chain of upst
 | `code` | HTTP | OpenAI `type` | When |
 |---|---|---|---|
 | `provider_unavailable` | 503 | `api_error` | No upstream is currently eligible for this model (every provider disabled or below balance floor). Try another model or retry shortly. |
-| `no_provider_available` | 400 | `invalid_request_error` | The requested (model, parameter) combination isn't currently serveable — the slug exists in the catalog but no internal route is enabled for it right now. Pick a different combination or check the catalog. |
+| `no_provider_available` | 400 | `invalid_request_error` | The requested (model, parameter) combination has no route — the slug exists in the catalog but nothing serves it with these parameters (the catalog row says `available: false` with an `unavailable_reason` when the whole model is in that state). A route that exists but failed to start the job is `provider_unavailable` (503), never this code. |
 | `no_streaming_upstream` | 503 | `api_error` | The model has eligible non-stream upstreams but none of them support real SSE streaming. The request was sent with `stream: true`. |
 | `upstream_timeout` | 504 | `timeout_error` | The upstream took longer than our 5-minute budget or the edge proxy closed the connection. For long reasoning, use `stream: true`. |
 | `render_timeout` | 504 | `timeout_error` | Synchronous image render only: the whole provider cascade ran past its 300-second budget and was abandoned. **Nothing was charged.** Retry, or move to `POST /v1/llm/images/jobs`, which keeps the full per-provider budgets because it holds no connection. Set your client timeout above 300 s so you read this instead of your own socket error. |
@@ -210,9 +202,9 @@ The async surfaces (`POST /v1/llm/videos/jobs`, `POST /v1/llm/music/jobs`, `POST
 
 | `code` | HTTP | OpenAI `type` | When |
 |---|---|---|---|
-| `job_not_found` | 404 | `invalid_request_error` | The id doesn't belong to your account, never existed, or fell out of the 60-minute state TTL after kickoff. Re-kick off the job. |
+| `job_not_found` | 404 | `invalid_request_error` | The id doesn't belong to your account, never existed, or the job record has expired — **15 minutes** after kickoff for images, **2 hours** for video, **60 minutes** for music, audio and Topaz. Re-kick off the job. |
 
-A `data.status: "failed"` payload is **not** an HTTP error — the request itself was valid, the upstream just didn't deliver. The job is no longer pollable after `failed` or `completed`. Re-kick off to retry. Nothing was charged for a `failed` job.
+A `data.status: "failed"` payload is **not** an HTTP error — the request itself was valid, the upstream just didn't deliver. Both terminal payloads, `completed` and `failed`, are **replayed to every later poll** until the record expires, so a poll lost to a timeout does not lose the result; you are charged once, on the poll that first delivered it (an image replay carries the hosted `url` without the `b64_json`). Re-kick off to retry a failure. Nothing was charged for a `failed` job.
 
 ```jsonc
 // GET /v1/llm/videos/jobs/{job_id} — failed (HTTP 200, status:"failed")
@@ -259,9 +251,10 @@ Two timing facts worth wiring into your client:
   rejection rather than an image.
 - **Keep your polling budget at 10 minutes.** Worst-case successful delivery (a slow render followed
   by an internal retry on an alternate route) approaches 7 minutes on the nano-banana family. A
-  7-minute client-side ceiling will abandon jobs that GPUniq would still have delivered; nothing is
-  charged until an image is actually delivered to a poll, so an abandoned job costs nothing but the
-  wait.
+  7-minute client-side ceiling will abandon jobs that GPUniq would still have delivered. Abandoning
+  does not make a job free: images rendered on GPUniq's own pipeline (most of the catalog) are
+  charged when the render finishes whether or not you poll, and the result stays pollable for 15
+  minutes — see [How pricing works](/llm/models#how-pricing-works).
 
 Failed jobs are billed **nothing**, regardless of the cause. Music job failures currently carry only
 the human-readable `error` string.
@@ -332,7 +325,7 @@ Video kickoff errors fold into the tables above, but a few combinations come up 
 
 **Fix:** read `meta.hint` first — it's pre-translated to GPUniq's request shape. Adjust the named field and retry.
 
-**3. `no_provider_available` — the (model, params) combo isn't routeable.** Returned when the slug is in the catalog but no internal route is currently enabled for the requested parameter combination. Most often: a 4K resolution / master tier / longer-than-supported duration combo that's priced but not yet wired.
+**3. `no_provider_available` — the (model, params) combo isn't routeable.** Returned when the slug is in the catalog but no internal route is currently enabled for the requested parameter combination. Most often: a 4K resolution / master tier / longer-than-supported duration combo that's priced but not yet wired. It never means "the route failed" — a route that exists but rejected the kickoff is reported as `provider_unavailable` (503, retry later).
 
 ```jsonc
 {
@@ -436,11 +429,11 @@ the next one instead. If every upstream is silent you get an
 `request_id` — the failure is recorded server-side as
 `empty_upstream_stream` and is visible to the operator.
 
-### "I get `streaming_required` on a request that used to work."
+### "My non-streaming request with a large `max_tokens` returns 200 with whitespace first."
 
-`max_tokens > 4096` without `stream: true` is now rejected up-front. Previously, GPUniq would silently upgrade the upstream call to streaming and reassemble the SSE chunks into a non-stream response. That worked for SDKs but ate connections on every Cloudflare-fronted client (browsers, mobile, behind corporate proxies). The new behaviour is to fail fast with a clear error code and `doc_url` so the client can react.
+That is the keep-alive path: `max_tokens > 4096` without `stream: true` is served by streaming from the upstream internally while whitespace keep-alive bytes hold your connection open, and the final JSON follows. The `streaming_required` 400 that used to refuse such requests is retired. Read the body to the end, then branch on `error` before `choices` — an upstream failure on this path is a 200 with an `error` body.
 
-**Fix:** add `"stream": true` to the request body. If your client can't speak SSE, use the [`POST /v1/llm/chat/jobs`](/llm/long-generations#3-job-based-long-poll-api) job-based pattern instead.
+**Fix:** none needed; for the cleanest contract add `"stream": true`, or use the [`POST /v1/llm/chat/jobs`](/llm/long-generations#3-job-based-long-poll-api) job-based pattern if your client can't speak SSE.
 
 ### "I get `insufficient_balance` but my dashboard shows funds."
 

@@ -35,6 +35,29 @@ OPENAI_BASE_URL=https://api.gpuniq.com/v1/openai
 
 Every field of the OpenAI Chat Completions protocol is forwarded unchanged: `tools`, `tool_choice`, `response_format`, `logprobs`, `seed`, `stream`, `stream_options`, etc.
 
+Authentication takes either header on every `/v1/openai/*` route (and
+`/v1/responses`): `Authorization: Bearer gpuniq_…`, the shape the SDKs send,
+or `X-API-Key: gpuniq_…`, the shape the native API uses. A missing
+credential is `401 authentication_required` in the OpenAI error envelope.
+Successful responses carry the `X-RateLimit-*` headers.
+
+### `usage.cost` is what you were charged
+
+Every `chat/completions` response carries `usage.cost`: the amount GPUniq
+debited for the call, in USD. On a stream it is the list-price estimate
+(cached input included); the exact charge with your personal discount is in
+`GET /v1/llm/usage/requests/{id}`. Upstream cost breakdowns are never
+forwarded.
+
+### Models list
+
+`GET /v1/openai/models` returns every id `chat/completions` accepts — the
+GPUniq catalog and the external OpenRouter tier — in the OpenAI
+`{"object": "list", "data": [...]}` shape. `created` is the vendor's release
+timestamp where it is known; `1735689600` (2025-01-01) stands for "unknown".
+Prices are not part of the OpenAI schema — read
+[`GET /v1/llm/models/catalog`](/llm/models) for them.
+
 ### Official OpenAI SDK
 
 <CodeGroup>

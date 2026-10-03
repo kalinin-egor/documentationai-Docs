@@ -27,8 +27,13 @@ completion poll returns. A failed or timed-out job costs nothing.
 
 `POST /v1/llm/images/jobs` returns a `job_id` in under a second, and you
 poll `GET /v1/llm/images/jobs/{job_id}` every 2-3 seconds until the
-status is terminal. You are charged only when the completion poll
-returns — a timed-out or failed job costs nothing. Server-side, polls
+status is terminal. Models rendered on GPUniq's own pipeline (most of the
+catalog) are charged when the render finishes, whether or not you poll;
+natively async upstreams (Nano Banana line, `gpt-image-2` family) are
+charged on the first poll that returns the image. A failed or timed-out job
+costs nothing. The terminal payload is replayed to every later poll for
+**15 minutes** after kickoff (a replayed image carries the hosted `url`
+without the `b64_json`), and you are charged once. Server-side, polls
 that arrive within 2 seconds of each other are coalesced via Redis, so
 hammering the endpoint will not be billed as repeated upstream calls.
 
@@ -198,7 +203,11 @@ while time.time() < deadline:
 
 ## Models & pricing
 
-Image models are billed per returned image, not per token.
+Image models are billed per returned image, not per token. To know the
+price before starting, `POST /v1/llm/images/jobs/estimate` with the kickoff
+body: it resolves the size tier the way the kickoff does and answers with
+`estimated_cost_usd` without rendering anything. The catalog's `pricing`
+block lists the tiers (`by_size_usd`) for the sized families.
 
 | Model | Slug | Price / image | Notes |
 |-------|------|---------------|-------|
@@ -415,7 +424,7 @@ response shape:
 
 The second mode runs the same multi-tier provider cascade the synchronous
 endpoint uses, so failover, moderation verdicts and format conversion all
-behave identically. You are still charged only on delivery.
+behave identically. You are charged when the render finishes, poll or not.
 
 **Video has no synchronous endpoint at all.** Every video generation goes
 through `POST /v1/llm/videos/jobs` — there is nothing to migrate and no

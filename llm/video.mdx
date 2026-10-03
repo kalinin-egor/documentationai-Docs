@@ -1,6 +1,6 @@
 ---
 title: Video generation
-description: Text-to-video, image-to-video, first/last-frame and reference-to-video across Veo 3.1, Kling, Seedance, Sora, Wan and Runway — one async job API, charged only on delivery.
+description: Text-to-video, image-to-video, first/last-frame and reference-to-video across Veo 3.1, Kling, Seedance, Sora, Wan and Runway — one async job API, charged on delivery.
 ---
 
 Every video model in the catalog runs on one async surface: `POST /v1/llm/videos/jobs`
@@ -8,8 +8,9 @@ returns a `job_id` in under a second, and you poll
 `GET /v1/llm/videos/jobs/{job_id}` until the status is terminal. **There is no
 synchronous video endpoint** — nothing to migrate, no connection to lose.
 
-You are charged only when a poll returns a `video.url`. A failed or timed-out
-job costs nothing.
+You are charged once, on the first poll that returns a `video.url`; later
+polls replay the completed payload until the job record expires, **2 hours**
+after kickoff. A failed or timed-out job costs nothing.
 
 <Columns cols="3">
   <Card title="Request body" href="#request-body" icon="list">
@@ -251,7 +252,8 @@ user-facing price stays stable.
   "video": {
     "url": "https://cdn.example.com/.../output.mp4",
     "stored_url": "https://api.gpuniq.com/v1/llm/media/8xK2p….mp4",
-    "stored_expires_in_days": 7
+    "stored_expires_in_days": 7,
+    "stored_ready": false
   },
   "cost_usd": 0.315,
   "balance_usd": 9.17825791,
@@ -270,6 +272,7 @@ the response tells you where:
 |-------|-----------|
 | `video.url` / `image.b64_json` | the original delivery — live immediately, unchanged |
 | `video.stored_url` / `image.url` | a GPUniq-hosted copy at `https://api.gpuniq.com/v1/llm/media/{token}` |
+| `video.stored_ready` | `false` on the delivering poll while the copy is still being written; `true` on a later poll once `stored_url` resolves |
 | `stored_expires_in_days` / `expires_in_days` | how long that copy is kept (**7 days** by default) |
 
 Why it matters: the upstream `video.url` points at the rendering
@@ -291,7 +294,9 @@ response is sent, so `url` works the moment you receive it. For
 **videos** the copy runs in the background — a clip is tens of megabytes
 and we would rather not make the delivering poll wait on it — so
 `stored_url` becomes valid shortly after the response; `url` is live
-immediately either way. And if storage is briefly unavailable the
+immediately either way. Poll the job once more rather than hammering
+`stored_url`: the replayed payload flips `video.stored_ready` to `true` when
+the copy has landed. And if storage is briefly unavailable the
 `stored_url` / `url` fields are simply absent: the generation still
 succeeds and is still delivered, because a storage hiccup is never
 allowed to fail a render you paid for.
@@ -302,6 +307,15 @@ Video models are billed per delivered video or per second of output —
 the `Headline / video` column is the cheapest default configuration, not a
 flat rate. The exact amount charged is always in the completion response's
 `cost_usd`.
+
+To know the price of a specific configuration before starting it, send the
+kickoff body to `POST /v1/llm/videos/jobs/estimate` — Kling / Veo are
+priced off the very route the kickoff would use, per-second lines off
+resolution and duration (reference clips add their input seconds at the
+upstream's cap). The catalog's `pricing` block carries the tables:
+`per_second_usd` by resolution for the per-second lines and
+`by_resolution_usd` per clip for Kling / Veo at the defaults listed in
+`assumes`.
 
 | Family | Slug | Headline / video | Notes |
 |--------|------|------------------|-------|
@@ -611,8 +625,9 @@ GET  https://api.gpuniq.com/v1/llm/videos/jobs/{job_id}   → poll every 3–5 s
 
 Auth is `X-API-Key: gpuniq_...` on both calls (a JWT works too). The
 kickoff returns in under a second; the job id stays valid across
-internal provider fallbacks and lives in our job store for **60
-minutes**, after which a poll returns `job_not_found` (404). Renders
+internal provider fallbacks and lives in our job store for **2 hours**,
+after which a poll returns `job_not_found` (404); within that window a
+terminal result is replayed to every poll. Renders
 usually land in a few minutes; a job that shows no upstream progress
 for 30 minutes is failed definitively rather than left polling.
 

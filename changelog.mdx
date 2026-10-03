@@ -7,6 +7,80 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-10-03" description="Catalog, billing and job-API fixes from the integrator audit" tags={["fix", "feature", "billing"]}>
+
+## Catalog
+
+- `external_models` no longer lists ids that resolve to a native row
+  (`anthropic/claude-haiku-4.5`, `qwen/qwen3-max`, …): a request under such
+  an id was always routed and billed as the native slug, so the second price
+  was never real. Each native row now lists those spellings in `aliases`.
+  Routing variants (`:batch`, `:free`, `:online`, …) are not listed; they
+  cannot be called through `chat/completions`.
+- `sora-2`, `sora-2-pro`, `MiniMax-Hailuo-02` and `hailuo-2.3` were listed as
+  image models; they are gone, and the names resolve to the video SKUs
+  (`sora-2-video`, `sora-2-pro-video`, `hailuo-02`, `hailuo-2-3`).
+  `MiniMax-M2.5` resolves to the single `minimax-m2.5` row.
+- Video and music rows carry their unit price in `retail_usd_per_unit`
+  (`retail_usd_per_image` keeps it for one release). New fields:
+  `available` / `unavailable_reason`, `pricing` (rates by resolution / size
+  tier), `retail_cached_input_usd_per_mtok`, `capabilities.max_output_tokens`;
+  `capabilities.context_tokens` now comes from the vendor's published window
+  (gpt-4.1 = 1,047,576, not 128,000).
+- `GET /v1/openai/models` lists the external tier too and carries a real
+  `created` (vendor release timestamp; `1735689600` means unknown).
+
+## Price before you start
+
+`POST /v1/llm/{images,videos,music,audio}/jobs/estimate` take the kickoff
+body and return `estimated_cost_usd` (list) and `discounted_cost_usd`
+(yours) without rendering or debiting anything.
+
+## Billing
+
+- Cached input is discounted exactly when the provider that served the call
+  discounted it for GPUniq — `prompt_tokens_details.cached_tokens` at the
+  cached rate, otherwise as normal input.
+- `usage.cost` is the amount GPUniq charged (stream: the list-price
+  estimate); upstream cost breakdowns are no longer forwarded.
+- `GET /v1/llm/usage/history` adds `cost_usd` / `total_cost_usd`;
+  `cost_rub` / `total_cost_rub` were always USD and are now deprecated
+  aliases.
+
+## Media jobs
+
+- A finished job answers every later poll: the `completed` / `failed`
+  payload is replayed until the record expires (images 15 min, video 2 h,
+  music / audio / Topaz 60 min), and you are charged once. Previously the
+  result was returned to exactly one poll and the next one was
+  `job_not_found`.
+- `video.stored_ready` says whether the GPUniq-hosted copy behind
+  `stored_url` has landed.
+- `data:` image inputs are hosted before dispatch on the Kling / Veo path
+  too (a 19 KB inline frame on `veo-3-1-lite` used to fail with "Images size
+  exceeds limit").
+- Motion control: `character_orientation` defaults to `video` on every route
+  (kie refused jobs without it after four minutes).
+- A video kickoff whose routes all failed is `provider_unavailable` (503);
+  `no_provider_available` (400) is reserved for a combination nothing routes.
+- Text-to-speech without `voice` uses the stock voice `21m00Tcm4TlvDq8ikWAM`
+  (Rachel), as documented.
+
+## OpenAI-compatible surface
+
+- `X-API-Key` works on `/v1/openai/*` and `/v1/responses`; a missing
+  credential is `401 authentication_required` (was 403 "Not authenticated").
+- `X-RateLimit-*` headers reach the client on successful responses and on
+  the 429 itself; `Retry-After` is forwarded; both are CORS-exposed.
+- A mid-stream upstream error is one strict `{"error": {message, type,
+  code}}` frame — no upstream bookkeeping (such as a `user_id`) leaks.
+  OpenRouter's 400 / 404 keep their status and reason instead of becoming a
+  502.
+- The `streaming_required` 400 is retired: a non-streaming request above
+  4096 output tokens is served through the keep-alive path. Docs corrected.
+
+</Update>
+
 <Update label="2026-09-30" description="Seedance 2.5 in 1080p: render a 480p draft, then its final" tags={["feature", "video"]}>
 
 ## 1080p on `seedance-2-5`
