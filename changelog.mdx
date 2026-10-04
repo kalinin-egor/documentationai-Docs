@@ -7,6 +7,24 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-10-04" description="Seedance 2.5 renders 1080p directly" tags={["feature", "video", "billing"]}>
+
+## Direct 1080p on `seedance-2-5`
+
+`"resolution": "1080p"` on `seedance-2-5` is no longer a 400: the clip
+renders at 1080p in one job, without a 480p draft. The 1080p rate is
+now $0.86/s (was $0.80/s for the draft final) and applies to both the
+direct render and the final of a draft. With reference video the
+1080p rate is $1.03/s and only the output seconds are billed.
+
+At 1080p there is no `last_frame_url` and no `video_task`, and
+`aspect_ratio: "auto"` needs an image or video input. `capabilities.resolutions`
+now matches what the API accepts: `480p` / `720p` / `1080p` on
+`seedance-2-5`, `480p` / `720p` on `-fast` / `-mini`.
+Details: [1080p on Seedance 2.5](/llm/video#1080p-on-seedance-25-draft-final).
+
+</Update>
+
 <Update label="2026-10-03" description="Catalog, billing and job-API fixes from the integrator audit" tags={["fix", "feature", "billing"]}>
 
 ## Catalog
