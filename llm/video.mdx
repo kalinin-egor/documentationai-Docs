@@ -854,26 +854,120 @@ curl -X POST https://api.gpuniq.com/v1/llm/videos/jobs \
 ```
 
 <div id="1080p-on-seedance-25-draft-final" />
+<div id="seedance-25-draft-mode" />
 
-#### 1080p on Seedance 2.5 — direct, or draft then final
+#### Seedance 2.5 with and without Draft Mode
 
-There are two ways to 1080p on `seedance-2-5`, both at $0.86/s:
+Draft Mode is ByteDance's two-step way to 1080p: render the shot at 480p,
+look at it, and then render **the same shot** at 1080p. On
+`seedance-2-5` there is no field that switches it on or off. The
+`resolution` you send decides:
 
-- **Direct.** `"resolution": "1080p"` on `POST /v1/llm/videos/jobs`
-  renders the clip at 1080p in one job, no draft involved. No
-  `last_frame_url` and no `video_task` at this tier, and
-  `aspect_ratio: "auto"` needs an image or video input to take the frame
-  from (otherwise name a ratio). A job with reference video bills its
-  output seconds only. Like the final, it runs on a single upstream with
-  no provider failover.
-- **Draft, then final** — ByteDance's Draft Mode: you render the shot at
-  480p, check it, and then render **the same shot** at 1080p. On the API
-  that is two calls, described below.
+| You send | Draft Mode | You get | List price |
+|----------|------------|---------|------------|
+| `"resolution": "480p"` | **on**, automatically | a 480p clip, plus a `draft` block: the same shot can be rendered at 1080p for 7 days | $0.198/s |
+| `"resolution": "720p"` (default) | off | a 720p clip | $0.426/s |
+| `"resolution": "1080p"` | off | a 1080p clip in one job | $0.86/s |
+| `POST /v1/llm/videos/jobs/{job_id}/final` on a 480p draft | — | the draft's shot at 1080p, as a new job | $0.86/s |
+
+**Which one to use.** Draft Mode pays off when you iterate on a prompt:
+try it at 480p a few times and pay the 1080p rate only for the take you
+keep. Four 5-second tries and one keeper cost 4 × $0.99 + $4.30 =
+**$8.26** through drafts, against 4 × $4.30 = **$17.20** as four direct
+1080p renders. When you already know the shot, a direct 1080p render is
+one job and $0.99 cheaper per 5 s than draft + final.
+
+##### Without Draft Mode: 1080p in one job
+
+Send `"resolution": "1080p"`. Nothing else changes: same endpoint, same
+polling, same fields as any other `seedance-2-5` job.
+
+<CodeGroup>
+```bash cURL
+# 1. Kick off a 5-second 1080p clip — no draft involved
+curl -X POST https://api.gpuniq.com/v1/llm/videos/jobs \
+  -H "X-API-Key: gpuniq_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "seedance-2-5",
+    "prompt": "a paper boat drifting down a rain gutter, macro shot, evening light",
+    "duration": 5,
+    "resolution": "1080p",
+    "aspect_ratio": "16:9"
+  }'
+
+# → {"exception":0,"data":{"job_id":"vid_5d2e81c0b7a94f6e8c13",
+#                          "status":"pending","estimated_cost_usd":4.3,...}}
+
+# 2. Poll every 3–5 s until status is completed or failed
+curl https://api.gpuniq.com/v1/llm/videos/jobs/vid_5d2e81c0b7a94f6e8c13 \
+  -H "X-API-Key: gpuniq_your_key"
+
+# → {"exception":0,"data":{"status":"completed",
+#                          "video":{"url":"https://.../out.mp4"},
+#                          "cost_usd":4.3,...}}     ← no "draft" block
+```
+
+```python Python
+import time, requests
+
+BASE = "https://api.gpuniq.com/v1/llm"
+HEADERS = {"X-API-Key": "gpuniq_your_key"}
+
+start = requests.post(f"{BASE}/videos/jobs", headers=HEADERS, json={
+    "model": "seedance-2-5",
+    "prompt": "a paper boat drifting down a rain gutter, macro shot, evening light",
+    "duration": 5,
+    "resolution": "1080p",   # direct 1080p — no draft
+    "aspect_ratio": "16:9",
+}).json()["data"]
+
+deadline = time.time() + 900
+while time.time() < deadline:
+    time.sleep(5)
+    d = requests.get(f"{BASE}/videos/jobs/{start['job_id']}", headers=HEADERS).json()["data"]
+    if d["status"] in ("completed", "failed"):
+        break
+print(d["status"], d.get("video", {}).get("url"), d.get("cost_usd"))
+```
+</CodeGroup>
+
+What is different at 1080p:
+
+- No `last_frame_url` and no `video_task` (edit / extend run at 480p or
+  720p). A start frame (`image_url`) and reference images, videos and
+  audio all work.
+- `aspect_ratio: "auto"` needs an image or a video to take the frame
+  from; without one, name a ratio (`16:9`, `9:16`, `1:1`, `4:3`, `3:4`,
+  `21:9`). Each of these is a 400 at kickoff, before anything is billed.
+- With reference video the rate is $1.03/s and **only the output
+  seconds** are billed; the reference clip adds nothing at this tier.
+- The tier renders on a single upstream, so there is no provider
+  failover. If your personal price falls below what that upstream
+  charges, the job is refused with `no_provider_available` — contact
+  support.
+
+##### With Draft Mode: 480p draft, then the 1080p final
 
 **1. Render the 480p draft.** An ordinary job with `"model":
-"seedance-2-5"` and `"resolution": "480p"`; there is no draft flag to
-set. A fresh 480p render on this SKU is kept as a draft automatically.
+"seedance-2-5"` and `"resolution": "480p"`. There is no draft flag to
+set: a fresh 480p render on this SKU is kept as a draft automatically.
 It is billed like any 480p clip ($0.198/s).
+
+```bash
+curl -X POST https://api.gpuniq.com/v1/llm/videos/jobs \
+  -H "X-API-Key: gpuniq_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "seedance-2-5",
+    "prompt": "a paper boat drifting down a rain gutter, macro shot, evening light",
+    "duration": 30,
+    "resolution": "480p",
+    "aspect_ratio": "16:9"
+  }'
+
+# → {"exception":0,"data":{"job_id":"vid_3f1c0b5e2a7d4c8e9f01","status":"pending",...}}
+```
 
 **2. Read `data.draft` in the completed poll.** A job that was kept as
 a draft carries the offer for its final:
@@ -916,6 +1010,46 @@ charged on delivery at the 1080p rate, $0.86/s at list price. In the web
 chat's video panel the same action is the **1080p · $X** button next to
 Download.
 
+The whole flow in Python:
+
+```python Python
+import time, requests
+
+HOST = "https://api.gpuniq.com"
+BASE = f"{HOST}/v1/llm"
+HEADERS = {"X-API-Key": "gpuniq_your_key"}
+
+
+def wait(job_id, budget_s=900):
+    deadline = time.time() + budget_s
+    while time.time() < deadline:
+        time.sleep(5)
+        d = requests.get(f"{BASE}/videos/jobs/{job_id}", headers=HEADERS).json()["data"]
+        if d["status"] in ("completed", "failed"):
+            return d
+    raise TimeoutError(job_id)
+
+
+# 1. 480p draft — Draft Mode is automatic at 480p
+job = requests.post(f"{BASE}/videos/jobs", headers=HEADERS, json={
+    "model": "seedance-2-5",
+    "prompt": "a paper boat drifting down a rain gutter, macro shot, evening light",
+    "duration": 5,
+    "resolution": "480p",
+    "aspect_ratio": "16:9",
+}).json()["data"]
+draft = wait(job["job_id"])
+offer = draft.get("draft") or {}
+print("draft:", draft.get("video", {}).get("url"),
+      "| 1080p final would cost", offer.get("final_estimated_cost_usd"))
+
+# 2. Keep this take? Render the same shot at 1080p — no body
+if offer.get("final_available"):
+    final_job = requests.post(f"{HOST}{offer['final_endpoint']}", headers=HEADERS).json()["data"]
+    final = wait(final_job["job_id"])
+    print("1080p:", final.get("video", {}).get("url"), "cost:", final.get("cost_usd"))
+```
+
 **What the final keeps.** Prompt, duration, aspect ratio, container,
 generated audio and every reference input come from the draft, which is
 why the call takes no body and nothing in it can be changed. Composition,
@@ -927,11 +1061,12 @@ upscale of the draft file.
 
 - The final can be requested for **7 days** after the draft
   (`expires_at`).
-- Drafts exist only for `seedance-2-5` at `480p`. A 720p job, an
-  edit/extend job (`video_task`) and every other model have no draft.
+- Drafts exist only for `seedance-2-5` at `480p`. A 720p or 1080p job,
+  an edit/extend job (`video_task`) and every other model have no draft.
 - No `draft` block in a completed 480p job means the clip was rendered
   on a route that cannot keep a draft (for example after an internal
-  fallback). That clip has no 1080p final. Render a new 480p job.
+  fallback). That clip has no 1080p final. Render a new 480p job, or
+  render the shot at 1080p directly.
 - Only the account that rendered the draft can finalise it.
 - The final runs on the one upstream that holds the draft, so unlike a
   normal job it has no provider failover.
@@ -947,7 +1082,7 @@ an envelope with a non-zero `exception`, so branch on
 | `no_provider_available` | 400 | The final isn't available at your current price. Contact support. |
 | `provider_unavailable` | 503 | Temporary. Retry with backoff. |
 
-**Cost of a 1080p clip = draft + final**, at list price:
+**Cost of a 1080p clip**, at list price — through a draft (two jobs) or directly (one job):
 
 | Duration | 480p draft ($0.198/s) | 1080p final ($0.86/s) | Total | Direct 1080p |
 |----------|-----------------------|-----------------------|-------|--------------|
