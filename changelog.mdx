@@ -7,6 +7,37 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-10-05" description="Ruble billing at your top-up rates, and ruble prices across the usage API" tags={["feature", "billing"]}>
+
+## Ruble billing at the rate you topped up at
+
+Settings → **Ruble billing** (`PUT /v1/settings/rub-billing`). With it on,
+your spend is priced in rubles at the rate of the top-up the money came
+from — the oldest top-up is spent first, then the next one — instead of
+today's rate. Top up at 95 ₽/$ and spend $10: usage shows 950 ₽. Top up
+again at 100 ₽/$: charges stay at 95 until the first top-up runs out, then
+switch to 100. The balance itself stays in USD; the display currency
+switches to rubles. `GET /v1/settings/rub-billing` returns the balance in
+rubles and the top-ups it is made of, in spending order.
+
+## `cost_rub` everywhere a charge is reported
+
+- `usage.cost_rub` and `usage.fx_rate_rub` on `/v1/openai/chat/completions`
+  and `cost_rub` on `/v1/llm/chat/completions`, when the call was billed in
+  rubles.
+- `GET /v1/llm/usage/requests`, `GET /v1/llm/usage/requests/{id}`,
+  `GET /v1/llm/usage/history` and the usage export carry `cost_rub`,
+  `fx_rate_rub` and `rub_pricing`: `"billed"` — the rate of the top-up the
+  money came from; `"market"` — today's top-up rate, used for charges made
+  before ruble billing was switched on and for accounts billed in dollars.
+- `GET /v1/llm/usage/history`: `cost_rub` and `total_cost_rub` are now
+  rubles. Until today they were deprecated aliases of the USD figures;
+  `cost_usd` / `total_cost_usd` are unchanged.
+- `/v1/usage/activity`, `/v1/usage/calendar` and `/v1/llm/usage/breakdown`
+  add `*_rub` twins of every `*_usd` figure for ruble-billed accounts.
+
+</Update>
+
 <Update label="2026-10-04" description="Seedance 2.5 renders 1080p directly" tags={["feature", "video", "billing"]}>
 
 ## Direct 1080p on `seedance-2-5`

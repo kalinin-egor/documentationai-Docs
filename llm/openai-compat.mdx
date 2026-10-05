@@ -49,6 +49,13 @@ debited for the call, in USD. On a stream it is the list-price estimate
 `GET /v1/llm/usage/requests/{id}`. Upstream cost breakdowns are never
 forwarded.
 
+With [ruble billing](/changelog#ruble-billing-at-the-rate-you-topped-up-at)
+on, a non-stream response also carries `usage.cost_rub` and
+`usage.fx_rate_rub`: the same charge in rubles at the rate of the top-up the
+money came from. Streams do not know the final charge yet; read it from
+`GET /v1/llm/usage/requests/{id}`, where every row has `cost_rub` and
+`rub_pricing` (`"billed"` or `"market"`).
+
 ### Models list
 
 `GET /v1/openai/models` returns every id `chat/completions` accepts — the
