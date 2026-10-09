@@ -73,7 +73,7 @@ while time.time() < deadline:
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
 | `model` | string | yes | Slug from the [catalog](#models-pricing). |
-| `prompt` | string | yes | Up to 10 000 characters. |
+| `prompt` | string | yes | Up to 10 000 characters; up to **20 000** on `seedance-2` and `seedance-2-5` (10 000 for `video_task` edit / extend jobs). |
 | `duration` | int | no | Seconds. **Every model has its own legal set — see the [duration matrix](#duration-by-model) below.** An out-of-range value is a 400, not a silent clamp. |
 | `aspect_ratio` | string | no | `16:9` (default), `9:16`, `1:1` where supported. The Seedance 2 line (incl. `seedance-2-5`) additionally accepts `auto`, `21:9`, `4:3`, `3:4`. |
 | `image_url` | string | no | https URL or data URI — enables image-to-video (start frame). |
@@ -643,7 +643,7 @@ field; it is also listed by `GET /v1/llm/models/catalog`).
 | Field | Type | Accepted on `seedance-2-5` | Default |
 |-------|------|----------------------------|---------|
 | `model` | string | `"seedance-2-5"` — required | — |
-| `prompt` | string | required, 1–10 000 characters | — |
+| `prompt` | string | required, 1–20 000 characters (10 000 with `video_task`) | — |
 | `duration` | int | **any integer 4–30** (seconds) | `5` |
 | `resolution` | string | **`480p`, `720p` or `1080p`** — `4k` is a 400. At `1080p`: no `last_frame_url`, no `video_task`, and `aspect_ratio: auto` needs an image or video input | `720p` |
 | `aspect_ratio` | string | `16:9`, `9:16`, `1:1`, `auto`, `21:9`, `4:3`, `3:4` | `16:9` (`auto` follows the input frames) |
