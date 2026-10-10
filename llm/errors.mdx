@@ -139,6 +139,7 @@ The 429 carries `Retry-After` (seconds), `X-RateLimit-Limit`, `X-RateLimit-Remai
 | `model_not_found` | 400 | `invalid_request_error` | Slug isn't in the GPUniq catalog. Fetch `/v1/openai/models` for the current list. |
 | `model_required` | 400 | `invalid_request_error` | `body.model` is missing or empty. |
 | `model_is_image` | 400 | `invalid_request_error` | You called `/chat/completions` with an image-generation slug. Use `POST /v1/openai/images/generations` instead. |
+| `model_is_retrieval` | 400 | `invalid_request_error` | You called `/chat/completions` with an embedding or rerank slug. Use [`POST /v1/openai/embeddings` or `/rerank`](/llm/embeddings) instead. |
 | `model_disabled` | 503 | `api_error` | The model is administratively disabled platform-wide. Pick another from the catalog. |
 
 ### Request validation
@@ -146,6 +147,8 @@ The 429 carries `Retry-After` (seconds), `X-RateLimit-Limit`, `X-RateLimit-Remai
 | `code` | HTTP | OpenAI `type` | When |
 |---|---|---|---|
 | `messages_required` | 400 | `invalid_request_error` | `messages` is missing or empty. |
+| `input_required` | 400 | `invalid_request_error` | [Embeddings](/llm/embeddings): `input` is empty; rerank: `query` or `documents` is missing. |
+| `dimensions_unsupported` | 400 | `invalid_request_error` | [Embeddings](/llm/embeddings): `dimensions` on a model other than `text-embedding-3-large` / `-3-small`. |
 | `empty_message_content` | 400 | `invalid_request_error` | Any message has whitespace-only or empty content. |
 | `message_too_long` | 400 | `invalid_request_error` | A single message exceeds the maximum allowed length. |
 | `request_too_large` | 413 | `invalid_request_error` | The whole request body exceeds the size cap. |

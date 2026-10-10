@@ -1,0 +1,183 @@
+---
+title: Embeddings & rerank
+description: OpenAI-compatible embeddings and Cohere-style reranking on the same key and balance — models, request shapes, billing and errors.
+---
+
+Turn text into vectors for search, clustering and RAG, and re-order
+retrieved passages by relevance to a query. Both endpoints use your usual
+API key and USD balance, and every call lands in the same usage log as
+chat and media.
+
+| Endpoint | Wire format | Base URL |
+|----------|-------------|----------|
+| `POST /v1/openai/embeddings` | OpenAI Embeddings — the official SDKs work unchanged | `https://api.gpuniq.com/v1/openai` |
+| `POST /v1/openai/rerank` | Cohere / Jina rerank (`query` + `documents` → `results`) | `https://api.gpuniq.com/v1/openai` |
+
+Authenticate with `Authorization: Bearer gpuniq_…` or `X-API-Key: gpuniq_…`,
+as on every `/v1/openai/*` route.
+
+## Models
+
+### Embedding models
+
+| Model | Vector size | `dimensions` |
+|-------|-------------|--------------|
+| `text-embedding-3-large` | 3072 | Yes — any smaller size |
+| `text-embedding-3-small` | 1536 | Yes — any smaller size |
+| `text-embedding-ada-002` | 1536 | No |
+| `gemini-embedding-001` | 3072 | No |
+| `gemini-embedding-2-preview` | 3072 | No |
+
+### Rerank models
+
+| Model | Family |
+|-------|--------|
+| `qwen3-rerank` | Alibaba Qwen3 |
+| `qwen3-reranker-0.6b` | Alibaba Qwen3, 0.6B |
+| `bge-reranker-v2-m3` | BAAI BGE-M3 |
+| `bge-reranker-v2-m3-pro` | BAAI BGE-M3 |
+| `bce-reranker-base-v1` | NetEase Youdao BCE |
+
+In [the catalog](/llm/models#what-the-catalog-returns) these models carry
+`media_kind: "embedding"` or `"rerank"`, so they never show up among chat
+models. `GET /v1/llm/models/catalog` is the source of truth for the list and
+the live per-token price.
+
+## Embeddings
+
+```bash
+curl https://api.gpuniq.com/v1/openai/embeddings \
+  -H "Authorization: Bearer gpuniq_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "text-embedding-3-small",
+    "input": ["GPUniq rents GPUs by the hour", "How do I rent a GPU?"]
+  }'
+```
+
+```python
+from openai import OpenAI
+
+client = OpenAI(api_key="gpuniq_your_key", base_url="https://api.gpuniq.com/v1/openai")
+
+resp = client.embeddings.create(
+    model="text-embedding-3-large",
+    input=["GPUniq rents GPUs by the hour", "How do I rent a GPU?"],
+    dimensions=1024,  # text-embedding-3 models only
+)
+vectors = [item.embedding for item in resp.data]
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `model` | string | Required. One of the embedding models above. |
+| `input` | string or array of strings | Required. One vector per element, returned in the same order (`index`). |
+| `dimensions` | integer | `text-embedding-3-large` and `-3-small` only — any other model answers `400 dimensions_unsupported` instead of silently returning its native size. |
+| `encoding_format` | `"float"` (default) or `"base64"` | `base64` returns each vector as a base64 string of little-endian float32 — smaller over the wire. |
+| `user` | string | Optional end-user identifier, passed through. |
+
+The vendor's own limits apply to its models — for the OpenAI models, up to
+2048 inputs per request and 8192 tokens per input.
+
+```json
+{
+  "object": "list",
+  "model": "text-embedding-3-large",
+  "data": [
+    { "object": "embedding", "index": 0, "embedding": [0.0123, -0.0456, "…"] },
+    { "object": "embedding", "index": 1, "embedding": [0.0089, -0.0312, "…"] }
+  ],
+  "usage": { "prompt_tokens": 14, "total_tokens": 14, "cost": 0.000001 }
+}
+```
+
+## Rerank
+
+Send a query and the passages you retrieved; get them back ordered by
+relevance.
+
+```bash
+curl https://api.gpuniq.com/v1/openai/rerank \
+  -H "Authorization: Bearer gpuniq_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen3-rerank",
+    "query": "what speeds up deep learning",
+    "documents": [
+      "Paris is the capital of France",
+      "A GPU accelerates neural network training",
+      "Bananas are yellow"
+    ],
+    "top_n": 2,
+    "return_documents": true
+  }'
+```
+
+```python
+import httpx
+
+resp = httpx.post(
+    "https://api.gpuniq.com/v1/openai/rerank",
+    headers={"Authorization": "Bearer gpuniq_your_key"},
+    json={
+        "model": "bge-reranker-v2-m3",
+        "query": "what speeds up deep learning",
+        "documents": ["Paris is the capital of France", "A GPU accelerates neural network training"],
+    },
+    timeout=60,
+)
+best = resp.json()["results"][0]["index"]
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `model` | string | Required. One of the rerank models above. |
+| `query` | string | Required. |
+| `documents` | array of strings | Required, non-empty. |
+| `top_n` | integer | How many results to return. Default: every document. |
+| `return_documents` | boolean | Echo each document's text back in the result. Default `false`. |
+
+```json
+{
+  "results": [
+    { "index": 1, "relevance_score": 0.75, "document": { "text": "A GPU accelerates neural network training" } },
+    { "index": 2, "relevance_score": 0.203, "document": { "text": "Bananas are yellow" } }
+  ],
+  "model": "qwen3-rerank",
+  "usage": { "prompt_tokens": 80, "total_tokens": 80, "cost": 0.000006 }
+}
+```
+
+`results` are sorted by `relevance_score`, highest first; `index` points into
+your `documents` array. Scores are comparable within one model's response —
+each model has its own scale, so a threshold tuned on one model does not carry
+over to another.
+
+## Billing
+
+- **Input tokens only.** Embeddings bill the tokens of every `input`; rerank
+  bills the query plus the documents as the model counts them. There are no
+  output tokens.
+- **20% below the vendor's official price** per token. The live rate is
+  `retail_input_usd_per_mtok` in the catalog; personal discounts apply on top,
+  exactly as for chat.
+- **`usage.cost`** in the response is what was debited for the call, in USD,
+  rounded to the micro-dollar ($0.000001) — a very short input on a cheap
+  model can round to $0. The call also appears in
+  `GET /v1/llm/usage/requests` like any other request.
+- A request that fails — validation, no upstream — is not charged.
+
+## Errors
+
+Errors use the [OpenAI envelope](/llm/errors#openai-compatible-v1openai).
+
+| `code` | HTTP | When |
+|--------|------|------|
+| `model_required` | 400 | `model` is missing or empty. |
+| `model_not_found` | 400 | The slug is not an embedding model (on `/embeddings`) or not a rerank model (on `/rerank`) — e.g. a reranker sent to `/embeddings`. |
+| `input_required` | 400 | Empty `input`; or a rerank call without `query` or without `documents`. |
+| `dimensions_unsupported` | 400 | `dimensions` on a model other than `text-embedding-3-large` / `-3-small`. |
+| `model_is_retrieval` | 400 | An embedding or rerank slug was sent to `/chat/completions`. |
+| `insufficient_balance` | 402 | The balance does not cover the request's estimated cost. |
+| `rate_limit_per_key` / `rate_limit_per_user` | 429 | Per-minute limits — shared with every other call on the key and account. |
+| `provider_unavailable` | 503 | The model's upstream is temporarily unavailable. Retry with backoff; nothing was charged. |

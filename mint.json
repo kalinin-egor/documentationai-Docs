@@ -76,6 +76,7 @@
         "llm/models",
         "llm/chat",
         "llm/openai-compat",
+        "llm/embeddings",
         "llm/images",
         "llm/video",
         "llm/audio",

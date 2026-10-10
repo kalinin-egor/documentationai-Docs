@@ -49,7 +49,7 @@ budgeting:
 | `label`, `description` | Human-readable name and one-line summary. |
 | `provider` | Vendor family — `anthropic`, `openai`, `google`, `xai`, `deepseek`, `qwen`, `zhipu`, `moonshot`, `bytedance`, `minimax`, … |
 | `category` | `flagship` / `reasoning` / `balanced` / `fast` — the shelf it sits on. |
-| `media_kind` | `text`, `image`, `video`, `music` or `audio`. Decides which endpoint serves it. |
+| `media_kind` | `text`, `image`, `video`, `music`, `audio`, `embedding` or `rerank`. Decides which endpoint serves it — the last two are [embeddings & rerank](/llm/embeddings). |
 | `retail_input_usd_per_mtok`, `retail_output_usd_per_mtok` | Text pricing, USD per million tokens, input and output priced separately. |
 | `retail_cached_input_usd_per_mtok` | What cached input costs on the model's primary route, or `null` when no route discounts it. Applied only when the provider that served your call gave GPUniq that discount — see [How pricing works](#how-pricing-works). |
 | `retail_usd_per_image` | Flat price per delivered image. Video and music rows still carry their unit price here for one more release — read `retail_usd_per_unit` for them. |

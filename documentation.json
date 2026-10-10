@@ -90,6 +90,11 @@
                     "icon": "plug"
                   },
                   {
+                    "title": "Embeddings & rerank",
+                    "path": "llm/embeddings",
+                    "icon": "search"
+                  },
+                  {
                     "title": "Image generation",
                     "path": "llm/images",
                     "icon": "image"

@@ -7,6 +7,22 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-10-11" description="Embeddings and rerank on the OpenAI-compatible API" tags={["feature", "llm"]}>
+
+## Embeddings and rerank
+
+Two new endpoints on the same key and balance:
+[`POST /v1/openai/embeddings`](/llm/embeddings#embeddings) (OpenAI format —
+the official SDKs work unchanged) and
+[`POST /v1/openai/rerank`](/llm/embeddings#rerank) (Cohere / Jina format).
+Five embedding models — `text-embedding-3-large`, `text-embedding-3-small`,
+`text-embedding-ada-002`, `gemini-embedding-001`,
+`gemini-embedding-2-preview` — and five rerankers, billed per input token at
+20% below the vendor's official price. They appear in the catalog with
+`media_kind: "embedding"` / `"rerank"`.
+
+</Update>
+
 <Update label="2026-10-05" description="Ruble billing at your top-up rates, and ruble prices across the usage API" tags={["feature", "billing"]}>
 
 ## Ruble billing at the rate you topped up at
