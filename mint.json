@@ -89,6 +89,7 @@
       "group": "Storage & Account",
       "pages": [
         "volumes",
+        "workspace-balances",
         "settings"
       ]
     },

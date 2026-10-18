@@ -1,0 +1,168 @@
+---
+title: Workspace balances
+description: Read the current balance of every workspace on your account in one call — the account total, what each workspace holds, and what it can spend right now.
+---
+
+Your GPUniq account has **one balance in USD**. Workspaces split it: a
+workspace can hold money of its own, and the rest stays free for the main
+workspace and every workspace without a balance of its own.
+`GET /v1/workspaces/balances` returns all of it in one call, read at one
+moment, so the numbers always add up.
+
+```bash
+curl https://api.gpuniq.com/v1/workspaces/balances \
+  -H "Authorization: Bearer gpuniq_your_key"
+```
+
+Authenticate with an API key (`Authorization: Bearer gpuniq_…` or
+`X-API-Key: gpuniq_…`) or with a dashboard session. The call is read-only and
+free; API-key calls count toward the key's usual rate limit.
+
+## How the money is split
+
+| Kind | Which workspace | Its `balance_usd` |
+|------|-----------------|-------------------|
+| `main` | The main workspace — top-ups land here unless you pick another one. Exactly one per account. | The account's **free** money: the balance minus what other workspaces hold. |
+| `own` | A workspace you moved money into (a transfer, or a top-up credited to it). | What is left of its own balance. It stops at zero even if the account still has money. |
+| `shared` | Any other workspace — no balance of its own. | The same free money as the main workspace: both spend from it. |
+
+So `shared` and `main` rows show the **same** number: that is one pool, not
+two. Add up the `main` row and every `own` row to get the account balance.
+
+Move money between workspaces and choose the main one in the dashboard under
+**Workspace → General → Workspace balance**.
+
+## Response
+
+```json
+{
+  "exception": 0,
+  "data": {
+    "currency": "USD",
+    "whole_account": true,
+    "account": {
+      "balance_usd": 2000.0,
+      "reserved_usd": 500.0,
+      "free_usd": 1500.0,
+      "credit_limit_usd": 0.0,
+      "main_workspace_id": 224
+    },
+    "workspaces": [
+      {
+        "id": 224,
+        "name": "Default project",
+        "is_default": true,
+        "is_main": true,
+        "kind": "main",
+        "balance_usd": 1500.0,
+        "own_balance_usd": null
+      },
+      {
+        "id": 399,
+        "name": "Client A",
+        "is_default": false,
+        "is_main": false,
+        "kind": "own",
+        "balance_usd": 500.0,
+        "own_balance_usd": 500.0
+      },
+      {
+        "id": 500,
+        "name": "Staging",
+        "is_default": false,
+        "is_main": false,
+        "kind": "shared",
+        "balance_usd": 1500.0,
+        "own_balance_usd": null
+      }
+    ],
+    "total": 3
+  }
+}
+```
+
+The main workspace comes first, then the rest: the default one, then by
+creation date.
+
+### `account`
+
+| Field | Meaning |
+|-------|---------|
+| `balance_usd` | The account balance — what every charge on the account debits. |
+| `reserved_usd` | Held by workspaces in their own balances. |
+| `free_usd` | Held by nobody: `balance_usd − reserved_usd`. This is the main workspace's balance. |
+| `credit_limit_usd` | How far below zero the account may go, if GPUniq opened credit for you; `0` otherwise. A `main` or `shared` workspace may spend `free_usd + credit_limit_usd`. An `own` workspace never uses credit. |
+| `main_workspace_id` | Id of the main workspace. |
+
+`account` is `null` when the caller sees one workspace only — see below.
+
+### `workspaces[]`
+
+| Field | Meaning |
+|-------|---------|
+| `id`, `name` | The workspace. Use `id` as `X-Workspace-Id` in dashboard requests. |
+| `is_default` | The workspace created with the account («Default project»). |
+| `is_main` | Top-ups land here by default. |
+| `kind` | `main`, `own` or `shared` — see the table above. |
+| `balance_usd` | What this workspace can spend right now, before credit. |
+| `own_balance_usd` | Its own balance; `null` for `main` and `shared`. Can go below zero after a refunded top-up that had already been spent. |
+
+All amounts are USD, rounded to four decimals.
+
+## Who sees what
+
+| Caller | Sees |
+|--------|------|
+| Dashboard session | Every workspace you own, with the account totals. Workspaces you were invited into are someone else's money and are not listed. `X-Workspace-Id` is ignored. |
+| API key of the **default** workspace | The whole account, as above. |
+| API key of **any other** workspace | That workspace only, `whole_account: false` and `account: null`. |
+
+Keys of a named workspace are often handed to the end customer of that
+workspace, so such a key never learns about your other workspaces or the
+account total. To monitor every workspace from a script, use a key created in
+the default workspace.
+
+<Callout kind="info">
+  A `shared` workspace's `balance_usd` is the account's free money — a key of a
+  shared workspace does see that figure, because it is exactly what limits the
+  key. Give an end customer a workspace with its own balance if the free money
+  must stay private.
+</Callout>
+
+## Examples
+
+<CodeGroup>
+```python Python
+import requests
+
+resp = requests.get(
+    "https://api.gpuniq.com/v1/workspaces/balances",
+    headers={"Authorization": "Bearer gpuniq_your_key"},
+    timeout=10,
+)
+data = resp.json()["data"]
+for ws in data["workspaces"]:
+    print(f"{ws['name']:<20} {ws['kind']:<6} ${ws['balance_usd']:.2f}")
+if data["account"]:
+    print(f"Account total: ${data['account']['balance_usd']:.2f}")
+```
+
+```javascript Node.js
+const resp = await fetch("https://api.gpuniq.com/v1/workspaces/balances", {
+  headers: { Authorization: "Bearer gpuniq_your_key" },
+});
+const { data } = await resp.json();
+const low = data.workspaces.filter((ws) => ws.balance_usd < 10);
+low.forEach((ws) => console.warn(`Low balance in ${ws.name}: $${ws.balance_usd}`));
+```
+</CodeGroup>
+
+A low-balance alert polled every few minutes is the typical use: when a
+workspace runs out, its requests get `402` with the code
+`workspace_budget_exhausted` while the other workspaces keep working.
+
+## Related
+
+- [`GET /v1/llm/balance`](/llm/models#your-balance) — the account balance alone.
+- Top up from the web dashboard → **Balance**; pick a workspace under
+  **Credit to** to put the money straight into it.

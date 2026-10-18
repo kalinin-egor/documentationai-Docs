@@ -136,6 +136,11 @@
                     "icon": "hard-drive"
                   },
                   {
+                    "title": "Workspace balances",
+                    "path": "workspace-balances",
+                    "icon": "wallet"
+                  },
+                  {
                     "title": "Settings",
                     "path": "settings",
                     "icon": "sliders"
