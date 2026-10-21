@@ -408,7 +408,15 @@ Notes worth knowing before you build on it:
   as `--stylize 750`, `--chaos 20`, `--niji 6` and so on is honoured;
   an `--ar` you write yourself wins over `size`.
 - **Reference images work** on `mj_imagine` via `input_images` (https
-  URLs or data URLs).
+  URLs or data URLs, up to 5). The URL must be downloadable without a
+  login; a presigned link has to outlive the render.
+- **Keep the prompt text within 3,072 bytes** (UTF-8) — about 3,000
+  Latin or 1,500 Cyrillic characters. Only the text before the first
+  `--parameter` counts, so `--ar 16:9 --stylize 750` is free, but each
+  reference image takes about 120 bytes of it. Longer prompts are turned
+  down by the fastest Midjourney route; the others are tried, but they
+  are slower, so a long prompt costs you minutes — and if none takes it,
+  the request fails with nothing charged.
 - **`mj_task_id` is opaque and route-bound.** Store it as a string and
   pass it back unchanged; every action runs where its render lives, so a
   handle from one render is not valid for another.
