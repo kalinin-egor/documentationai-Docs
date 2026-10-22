@@ -9,8 +9,9 @@ returns a `job_id` in under a second, and you poll
 synchronous video endpoint** — nothing to migrate, no connection to lose.
 
 You are charged once, on the first poll that returns a `video.url`; later
-polls replay the completed payload until the job record expires, **2 hours**
-after kickoff. A failed or timed-out job costs nothing.
+polls replay the completed payload for **7 days** after delivery and are
+never charged again. A failed or timed-out job costs nothing; its answer
+is kept for 2 hours.
 
 <Columns cols="3">
   <Card title="Request body" href="#request-body" icon="list">
@@ -629,9 +630,11 @@ GET  https://api.gpuniq.com/v1/llm/videos/jobs/{job_id}   → poll every 3–5 s
 
 Auth is `X-API-Key: gpuniq_...` on both calls (a JWT works too). The
 kickoff returns in under a second; the job id stays valid across
-internal provider fallbacks and lives in our job store for **2 hours**,
-after which a poll returns `job_not_found` (404); within that window a
-terminal result is replayed to every poll. Renders
+internal provider fallbacks. A delivered job answers every poll for
+**7 days** — the clip, its price and, for a 480p draft, the 1080p offer
+(`balance_usd` in a replay older than 2 hours is your current balance).
+A pending or failed job is kept for **2 hours**, after which a poll
+returns `job_not_found` (404). Renders
 usually land in a few minutes; a job that shows no upstream progress
 for 30 minutes is failed definitively rather than left polling.
 
@@ -1060,7 +1063,10 @@ upscale of the draft file.
 **Rules**
 
 - The final can be requested for **7 days** after the draft
-  (`expires_at`).
+  (`expires_at`). For those 7 days every poll of the 480p job returns
+  its `draft` block, so to check whether a result can still go to 1080p,
+  poll the 480p job and read `data.draft`; keep the 480p `job_id` — it is
+  the only handle the final takes.
 - Drafts exist only for `seedance-2-5` at `480p`. A 720p or 1080p job,
   an edit/extend job (`video_task`) and every other model have no draft.
 - No `draft` block in a completed 480p job means the clip was rendered

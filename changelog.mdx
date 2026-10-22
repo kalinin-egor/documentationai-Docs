@@ -7,6 +7,19 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-10-22" description="Delivered video jobs answer for 7 days; drafts reach 1080p for their whole 7 days" tags={["improvement", "llm"]}>
+
+## Video jobs: 7 days instead of 2 hours
+
+`GET /v1/llm/videos/jobs/{job_id}` on a delivered job now replays the
+completed answer for [7 days](/llm/video) — `video.url`, `stored_url`,
+`cost_usd` — instead of returning `job_not_found` after 2 hours. Nothing is
+charged again. A Seedance 2.5 480p draft keeps its `draft` block in those
+replays for as long as its 1080p final is available, so "can this result
+still go to 1080p?" is answered by polling the 480p job.
+
+</Update>
+
 <Update label="2026-10-11" description="Embeddings and rerank on the OpenAI-compatible API" tags={["feature", "llm"]}>
 
 ## Embeddings and rerank
