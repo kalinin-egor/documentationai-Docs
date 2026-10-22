@@ -317,6 +317,12 @@ take **1–2 minutes** (some actions below up to 2.5), so use the job API.
   1024px sheet.
 </Callout>
 
+On the job API a finished grid answers with **`images`** — all four
+frames in `mj_index` order, each as a hosted `url` with its
+`expires_in_days` — next to `image`, which is frame 1 with its bytes
+inline, as on every other model. A single-frame result (`mj_upscale`)
+has `image` only.
+
 Every delivered Midjourney image carries an `mj_task_id`. Pass it back
 with `mj_index` (1–4, reading order — 1 is top-left) to run an action on
 that frame:
@@ -328,7 +334,9 @@ job = requests.post(f"{BASE}/v1/llm/images/jobs", headers=H, json={
     "prompt": "an owl librarian in a candlelit archive",
     "size": "16:9",          # or 1920x1080 — becomes Midjourney's --ar
 }).json()["data"]
-# ... poll GET /v1/llm/images/jobs/{job_id} until status == "completed"
+# ... poll GET /v1/llm/images/jobs/{job_id} until status == "completed" → done
+frames = done.get("images") or [done["image"]]   # 4 frames; 1 for mj_upscale
+urls = [f["url"] for f in frames]
 
 # 2. More like frame 2, please
 requests.post(f"{BASE}/v1/llm/images/jobs", headers=H, json={

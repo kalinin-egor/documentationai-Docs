@@ -7,6 +7,18 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-10-23" description="Midjourney jobs return all four frames" tags={["fix", "llm", "images"]}>
+
+## Midjourney: four frames on the job API
+
+A finished Midjourney grid on `GET /v1/llm/images/jobs/{job_id}` now
+carries [`images`](/llm/images#midjourney) — all four frames by `url`, in
+`mj_index` order. Until now the job API returned only frame 1 in `image`,
+though the render (and the charge) covered four. `image` is unchanged, so
+existing clients keep working.
+
+</Update>
+
 <Update label="2026-10-22" description="Delivered video jobs answer for 7 days; drafts reach 1080p for their whole 7 days" tags={["improvement", "llm"]}>
 
 ## Video jobs: 7 days instead of 2 hours
