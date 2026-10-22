@@ -66,13 +66,18 @@ flushes whitespace keep-alive bytes to your connection every few seconds so
 no proxy on the way sees an idle socket. The final JSON is a normal
 `chat.completion` object. Two things to know:
 
-- The response carries `X-GPUniq-Long-Generation: keepalive` and arrives with
-  `Transfer-Encoding: chunked`; any HTTP client that reads the body to the end
-  handles it, but a client that parses the first bytes as JSON will see
-  whitespace first.
-- An upstream failure on this path cannot change the status line any more —
-  it arrives as HTTP **200** whose body is `{"error": {"message", "type",
-  "code"}}`. Branch on the presence of `error` before reading `choices`.
+- Whatever settles within the first keep-alive interval (about 15 s) is
+  answered the normal way: a finished completion as plain JSON, a refusal
+  with its real status — `400` for a bad request, `402` for balance, `503`
+  for an upstream that failed fast.
+- Past that the response carries `X-GPUniq-Long-Generation: keepalive` and
+  arrives with `Transfer-Encoding: chunked`; any HTTP client that reads the
+  body to the end handles it, but a client that parses the first bytes as
+  JSON will see whitespace first.
+- Once the keep-alive bytes have started, a failure cannot change the status
+  line any more — it arrives as HTTP **200** whose body is `{"error":
+  {"message", "type", "code"}}`, never as an empty completion. Branch on the
+  presence of `error` before reading `choices`.
 
 The `streaming_required` 400 that used to guard this limit is retired; no
 request is refused for its `max_tokens` alone.

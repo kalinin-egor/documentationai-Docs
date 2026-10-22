@@ -8,10 +8,12 @@ returns a `job_id` in under a second, and you poll
 `GET /v1/llm/videos/jobs/{job_id}` until the status is terminal. **There is no
 synchronous video endpoint** — nothing to migrate, no connection to lose.
 
-You are charged once, on the first poll that returns a `video.url`; later
-polls replay the completed payload for **7 days** after delivery and are
-never charged again. A failed or timed-out job costs nothing; its answer
-is kept for 2 hours.
+You are charged once, when the render finishes — whether or not you poll:
+a server-side watcher asks the upstream every second and settles the job
+the moment the clip exists, so abandoning a job does not make it free.
+Later polls replay the completed payload for **7 days** after delivery and
+are never charged again. A failed or timed-out job costs nothing; its
+answer is kept for 2 hours.
 
 <Columns cols="3">
   <Card title="Request body" href="#request-body" icon="list">
@@ -292,12 +294,12 @@ expect. `stored_url` is ours and lives exactly as long as the field says.
 
 Two practical notes. For **images** the copy is written before the
 response is sent, so `url` works the moment you receive it. For
-**videos** the copy runs in the background — a clip is tens of megabytes
-and we would rather not make the delivering poll wait on it — so
-`stored_url` becomes valid shortly after the response; `url` is live
-immediately either way. Poll the job once more rather than hammering
-`stored_url`: the replayed payload flips `video.stored_ready` to `true` when
-the copy has landed. And if storage is briefly unavailable the
+**videos** the copy runs in the background, and the poll that delivers
+the clip waits for it — up to 30 seconds — so the `stored_url` you receive
+already downloads (`video.stored_ready: true`). If the copy is still
+running after that, the answer goes out with `stored_ready: false` and a
+later poll flips it; if the copy failed, `stored_url` is absent and `url`
+still serves the clip. `url` is live immediately either way. And if storage is briefly unavailable the
 `stored_url` / `url` fields are simply absent: the generation still
 succeeds and is still delivered, because a storage hiccup is never
 allowed to fail a render you paid for.

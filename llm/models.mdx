@@ -51,10 +51,10 @@ budgeting:
 | `category` | `flagship` / `reasoning` / `balanced` / `fast` — the shelf it sits on. |
 | `media_kind` | `text`, `image`, `video`, `music`, `audio`, `embedding` or `rerank`. Decides which endpoint serves it — the last two are [embeddings & rerank](/llm/embeddings). |
 | `retail_input_usd_per_mtok`, `retail_output_usd_per_mtok` | Text pricing, USD per million tokens, input and output priced separately. |
-| `retail_cached_input_usd_per_mtok` | What cached input costs on the model's primary route, or `null` when no route discounts it. Applied only when the provider that served your call gave GPUniq that discount — see [How pricing works](#how-pricing-works). |
+| `retail_cached_input_usd_per_mtok` | What cached input costs: the input price × the vendor's own cached-input ratio (an open-weight model: the ratio of the endpoint it is bought from), the same whichever provider serves the call — so a model sold below list sells its cached input below list by the same margin. `null` when nothing prices a cache read; cached input is then billed as input. See [How pricing works](#how-pricing-works). |
 | `retail_usd_per_image` | Flat price per delivered image. Video and music rows still carry their unit price here for one more release — read `retail_usd_per_unit` for them. |
 | `retail_usd_per_unit` + `video_billing_unit` / `audio_billing_unit` | Media price and the unit it is charged in — `video`, `second`, `track` or `character`. |
-| `pricing` | Structured prices by variant where a table exists: `per_second_usd` by resolution (Seedance, with the reference-to-video rate), `by_resolution_usd` per clip at the model's kickoff defaults (Kling / Veo, spelled out in `assumes`), `by_size_usd` per image tier. `null` for everything else. |
+| `pricing` | Structured prices for every media row. A table where one exists: `per_second_usd` by resolution (Seedance, with the reference-to-video rate), `by_resolution_usd` per clip at the model's kickoff defaults (Kling / Veo, spelled out in `assumes`), `by_size_usd` per image tier. Otherwise the flat price: `{"unit", "per_unit_usd"}` with `unit` ∈ `video`, `image`, `track`, `kchar` (a thousand characters), `second`, `credit` (Topaz). `null` for text models. |
 | `available`, `unavailable_reason` | Whether a live route serves the model right now. `unavailable_reason` is `no_route` (nothing maps the slug) or `all_routes_disabled`. Hide a row with `available: false` — its kickoff would fail. |
 | `aliases` | Other spellings that resolve to this row: the vendor's dotted form (`claude-haiku-4.5`), the aggregator id (`anthropic/claude-haiku-4.5`). A request under any of them is routed and billed as this row. |
 | `discounted`, `discount_percent_label` | Whether this model is sold below vendor list, and by how much. |
@@ -212,9 +212,9 @@ Every surface bills against the same USD balance, but the *unit* differs:
 
 | Media kind | Unit | Charged when |
 |------------|------|--------------|
-| Text | per million tokens, input and output priced separately | On completion. `completion_tokens` includes any hidden reasoning tokens. Cached input (`prompt_tokens_details.cached_tokens`) is billed at `retail_cached_input_usd_per_mtok` **only when the provider that served the call gave GPUniq a cache discount**; otherwise as normal input. |
-| Image | flat, per delivered image | Models rendered on GPUniq's own pipeline (most of the catalog): when the render finishes, whether or not you poll. Natively async upstreams (Nano Banana line, `gpt-image-2` family): on the first poll that returns the image. |
-| Video | per clip, or per second of output — depends on the model | On the first poll that returns `video.url`. |
+| Text | per million tokens, input and output priced separately | On completion. `completion_tokens` includes any hidden reasoning tokens. Cached input (`prompt_tokens_details.cached_tokens`) is billed at `retail_cached_input_usd_per_mtok` — the model's own ratio, whichever provider served the call; when the field is `null` cached input is billed as normal input. |
+| Image | flat, per delivered image | When the render finishes, whether or not you poll. |
+| Video | per clip, or per second of output — depends on the model | When the render finishes, whether or not you poll. |
 | Music | per call (some models return two tracks for it) | On the first poll that returns the tracks. |
 | Speech & audio | per 1000 characters, or per second | On the first poll that returns the file. |
 | Topaz restoration | per credit, `$0.14` / credit | On the first poll that returns the result. See [Topaz](/llm/topaz#pricing). |

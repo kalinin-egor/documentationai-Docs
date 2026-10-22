@@ -27,13 +27,12 @@ completion poll returns. A failed or timed-out job costs nothing.
 
 `POST /v1/llm/images/jobs` returns a `job_id` in under a second, and you
 poll `GET /v1/llm/images/jobs/{job_id}` every 2-3 seconds until the
-status is terminal. Models rendered on GPUniq's own pipeline (most of the
-catalog) are charged when the render finishes, whether or not you poll;
-natively async upstreams (Nano Banana line, `gpt-image-2` family) are
-charged on the first poll that returns the image. A failed or timed-out job
-costs nothing. The terminal payload is replayed to every later poll for
-**15 minutes** after kickoff (a replayed image carries the hosted `url`
-without the `b64_json`), and you are charged once. Server-side, polls
+status is terminal. You are charged when the render finishes, whether or
+not you poll — natively async upstreams (Nano Banana line, `gpt-image-2`
+family) are watched server-side and settled the moment the image exists.
+A failed or timed-out job costs nothing. The terminal payload is replayed
+to every later poll for **15 minutes** after completion (a replayed image
+carries the hosted `url` without the `b64_json`), and you are charged once. Server-side, polls
 that arrive within 2 seconds of each other are coalesced via Redis, so
 hammering the endpoint will not be billed as repeated upstream calls.
 

@@ -7,6 +7,56 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-10-23" description="Cached input keeps the model's discount; one pricing block on every media row; long non-stream failures keep their status" tags={["improvement", "llm"]}>
+
+## Cached input: the model's ratio, whichever provider serves
+
+`retail_cached_input_usd_per_mtok` is now the input price × the vendor's
+cached-input ratio (an open-weight model: the ratio of the endpoint it is
+bought from), the same at billing whichever provider served the call — so
+the catalog card and the debit always agree, and a model sold below list
+sells its cached input below list by the same margin. Before, the ratio
+followed the provider that happened to answer. See
+[Models & pricing](/llm/models#how-pricing-works).
+
+## `pricing` on every media row
+
+Every media row of `GET /v1/llm/models/catalog` carries a `pricing` block:
+a table by variant where one exists, otherwise the flat
+`{"unit", "per_unit_usd"}` (`video`, `image`, `track`, `kchar`, `second`,
+`credit`). Topaz rows carry the same keys as the rest of the catalog.
+
+## Long non-stream requests: real status for early failures
+
+A non-stream request with `max_tokens > 4096` that is refused within the
+first keep-alive interval — a bad request, an empty balance, an upstream
+that fails fast — now answers with that status (`400`, `402`, `503`)
+instead of a `200` keep-alive body; and a failure later in the stream is
+a `200` with an `error` body, never an empty completion. Details in
+[Long generations](/llm/long-generations#2-long-non-streaming-requests-the-keep-alive-path).
+
+## Also
+
+- Video: the poll that delivers a clip waits for our copy of it (up to 30 s),
+  so `stored_url` downloads the moment you receive it.
+- Video: a job every provider is switched off for is `503 provider_unavailable`,
+  not `400 no_provider_available`; `wan-2-2-fast` kicks off again.
+- `POST /v1/llm/videos/jobs/estimate` prices exactly what the kickoff
+  reserves: the model's default resolution, the source length of an edit,
+  reference-clip seconds on the Seedance family only.
+- Billing moment documented as it is: images and video are charged when the
+  render finishes, whether or not you poll.
+- `capabilities.context_tokens` follows the model's generation (Claude 4.6+
+  and Sonnet 4.5+ at 1M, GPT-5.4+ at 1,050,000, DeepSeek V4 at 1,048,576),
+  also when OpenRouter's record is unavailable.
+- Qwen2.5 7B / 72B / Coder 32B / VL 72B are sold at the open-weight rate:
+  live OpenRouter price × margin (VL 72B $1.20 / $1.50 instead of $8.04).
+- Streams: an error frame after output has started is a strict
+  `{"error": {"message", "type", "code"}}` — nothing of the upstream's own
+  bookkeeping is relayed.
+
+</Update>
+
 <Update label="2026-10-22" description="Delivered video jobs answer for 7 days; drafts reach 1080p for their whole 7 days" tags={["improvement", "llm"]}>
 
 ## Video jobs: 7 days instead of 2 hours

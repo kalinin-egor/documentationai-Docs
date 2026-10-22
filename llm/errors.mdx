@@ -205,9 +205,9 @@ The async surfaces (`POST /v1/llm/videos/jobs`, `POST /v1/llm/music/jobs`, `POST
 
 | `code` | HTTP | OpenAI `type` | When |
 |---|---|---|---|
-| `job_not_found` | 404 | `invalid_request_error` | The id doesn't belong to your account, never existed, or the job record has expired — **15 minutes** after kickoff for images, **2 hours** for video, **60 minutes** for music, audio and Topaz. Re-kick off the job. |
+| `job_not_found` | 404 | `invalid_request_error` | The id doesn't belong to your account, never existed, or the job record has expired — **15 minutes** after completion for images, **7 days** after delivery for video (2 hours for a failed video job), **60 minutes** for music, audio and Topaz. Re-kick off the job. |
 
-A `data.status: "failed"` payload is **not** an HTTP error — the request itself was valid, the upstream just didn't deliver. Both terminal payloads, `completed` and `failed`, are **replayed to every later poll** until the record expires, so a poll lost to a timeout does not lose the result; you are charged once, on the poll that first delivered it (an image replay carries the hosted `url` without the `b64_json`). Re-kick off to retry a failure. Nothing was charged for a `failed` job.
+A `data.status: "failed"` payload is **not** an HTTP error — the request itself was valid, the upstream just didn't deliver. Both terminal payloads, `completed` and `failed`, are **replayed to every later poll** until the record expires, so a poll lost to a timeout does not lose the result; you are charged once, when the render finishes (an image replay carries the hosted `url` without the `b64_json`). Re-kick off to retry a failure. Nothing was charged for a `failed` job.
 
 ```jsonc
 // GET /v1/llm/videos/jobs/{job_id} — failed (HTTP 200, status:"failed")
@@ -434,7 +434,7 @@ the next one instead. If every upstream is silent you get an
 
 ### "My non-streaming request with a large `max_tokens` returns 200 with whitespace first."
 
-That is the keep-alive path: `max_tokens > 4096` without `stream: true` is served by streaming from the upstream internally while whitespace keep-alive bytes hold your connection open, and the final JSON follows. The `streaming_required` 400 that used to refuse such requests is retired. Read the body to the end, then branch on `error` before `choices` — an upstream failure on this path is a 200 with an `error` body.
+That is the keep-alive path: `max_tokens > 4096` without `stream: true` is served by streaming from the upstream internally while whitespace keep-alive bytes hold your connection open, and the final JSON follows. The `streaming_required` 400 that used to refuse such requests is retired. Read the body to the end, then branch on `error` before `choices` — a failure after the keep-alive bytes have started is a 200 with an `error` body (a refusal before them keeps its real status: 400, 402, 503).
 
 **Fix:** none needed; for the cleanest contract add `"stream": true`, or use the [`POST /v1/llm/chat/jobs`](/llm/long-generations#3-job-based-long-poll-api) job-based pattern if your client can't speak SSE.
 
