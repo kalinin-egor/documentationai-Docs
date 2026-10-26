@@ -262,6 +262,11 @@ user-facing price stays stable.
 }
 ```
 
+With [ruble billing](/changelog#ruble-billing-at-the-rate-you-topped-up-at)
+on, the completed job also carries `cost_rub` and `fx_rate_rub`: the same
+charge in rubles at the rate of the top-up the money came from. Accounts
+billed in dollars get neither key.
+
 The polling endpoint transparently falls back across internal routes if the first attempt fails — your `job_id` and the user-facing price stay stable across fallbacks. Internal route identifiers are deliberately omitted from the public response; they live only in admin/operator logs.
 
 ## Where delivered media lives

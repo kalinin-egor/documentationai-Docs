@@ -151,6 +151,8 @@ curl https://api.gpuniq.com/v1/llm/chat/jobs/chatjob_… \
 ```
 </CodeGroup>
 
+A `completed` job carries `content`, the token counts, `cost_usd` and `balance_usd` — plus `cost_rub` and `fx_rate_rub` with [ruble billing](/changelog#ruble-billing-at-the-rate-you-topped-up-at) on. A `failed` one carries `error`, a machine-readable `error_code` (`provider_unavailable`, `upstream_server_error`, `upstream_timeout`, `insufficient_balance`, `invalid_request`, `model_not_found`, …) and `cost_usd: 0` (`cost_rub: 0` with ruble billing): a failed job is never charged. The usage-log row of a failed attempt has the `job_id` as its `request_id`.
+
 The job survives client disconnects — once kicked off, generation runs to completion server-side and the result waits in Redis for **15 minutes**. You only pay when the completion poll returns; a client-side timeout that misses the result still bills the same amount once the generation finishes.
 
 ## 4. Reasoning models need extra `max_tokens` headroom

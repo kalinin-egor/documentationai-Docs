@@ -7,6 +7,43 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-10-26" description="Honest availability and output caps, explicit chat-job failures, TTS voices" tags={["fix", "llm"]}>
+
+## Catalog
+
+- `available: false` (`unavailable_reason: no_route`) now also marks a model
+  every upstream has stopped offering — checked against their live lists
+  every hour. Before, such a model showed `available: true` and failed on
+  the call (`glm-4.5-flash`, `moonshot-v1-*` and about a hundred others).
+- `capabilities.max_output_tokens` is the vendor's published cap or `null`.
+  A figure that was 90 % of the context window was a placeholder for
+  "unpublished", not a limit (`gpt-4.1-nano` showed 942,818; its cap is
+  32,768). `context_tokens` filled for `grok-code-fast-1`, `moonshot-v1-*`,
+  `qwq-32b`, `qwq-32b-preview`, `gemma-7b-it`, `babbage-002`, `davinci-002`.
+
+## Chat completions
+
+- `max_tokens` / `max_completion_tokens` above a hard vendor cap: HTTP 400
+  `max_tokens_exceeded` with `param`, instead of the last upstream's error
+  (`gpt-4.1-nano` at 32,769 came back as 404 `model_not_found`). An
+  upstream's "no endpoint can handle the requested parameters" is a 400
+  `invalid_request` too.
+- Non-stream responses name the catalog slug in `model` and always carry an
+  `id` (long non-stream requests answered with `"id": ""` and the vendor's
+  dated model name).
+
+## Jobs
+
+- A failed chat job carries `error_code` and `cost_usd: 0` (`cost_rub: 0`
+  with ruble billing); its usage-log row has the `job_id` as `request_id`.
+- ElevenLabs TTS: the stock voice is now `EkK5I93UQWFDigLMpZcX` — the
+  previous one was not served, so every TTS job without `voice` failed.
+  `voice` (and every dialogue turn's) is checked at kickoff against
+  [the served list](/llm/audio#voices): HTTP 400 with the field in
+  `data.meta.param`.
+
+</Update>
+
 <Update label="2026-10-26" description="The ruble price in every response that charges" tags={["improvement", "billing"]}>
 
 ## `cost_rub` in the response, not only in the usage log

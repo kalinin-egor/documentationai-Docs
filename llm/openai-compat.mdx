@@ -71,9 +71,13 @@ dollars get neither key. Every route that charges reports them:
 
 ### Models list
 
-`GET /v1/openai/models` returns every id `chat/completions` accepts — the
-GPUniq catalog and the external OpenRouter tier — in the OpenAI
-`{"object": "list", "data": [...]}` shape. `created` is the vendor's release
+`GET /v1/openai/models` returns the GPUniq catalog and the external
+OpenRouter tier in the OpenAI `{"object": "list", "data": [...]}` shape. It
+is the list of model ids, not of what `chat/completions` takes: image models
+go to `images/generations`, video, music and audio models to the native job
+APIs — the catalog's `media_kind` says which. The Topaz video upscalers
+(`topaz-video-*`) are served only by `POST /v1/llm/topaz/video/jobs` and are
+listed only in [`GET /v1/llm/models/catalog`](/llm/models). `created` is the vendor's release
 timestamp where it is known; `1735689600` (2025-01-01) stands for "unknown".
 Prices are not part of the OpenAI schema — read
 [`GET /v1/llm/models/catalog`](/llm/models) for them.

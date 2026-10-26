@@ -55,13 +55,13 @@ budgeting:
 | `retail_usd_per_image` | Flat price per delivered image. Video and music rows still carry their unit price here for one more release — read `retail_usd_per_unit` for them. |
 | `retail_usd_per_unit` + `video_billing_unit` / `audio_billing_unit` | Media price and the unit it is charged in — `video`, `second`, `track` or `character`. |
 | `pricing` | Structured prices by variant where a table exists: `per_second_usd` by resolution (Seedance, with the reference-to-video rate), `by_resolution_usd` per clip at the model's kickoff defaults (Kling / Veo, spelled out in `assumes`), `by_size_usd` per image tier. `null` for everything else. |
-| `available`, `unavailable_reason` | Whether a live route serves the model right now. `unavailable_reason` is `no_route` (nothing maps the slug) or `all_routes_disabled`. Hide a row with `available: false` — its kickoff would fail. |
+| `available`, `unavailable_reason` | Whether a live route serves the model right now. `unavailable_reason` is `no_route` (nothing serves the slug — including a model every upstream has stopped offering, checked hourly) or `all_routes_disabled`. Hide a row with `available: false` — its request would fail. |
 | `aliases` | Other spellings that resolve to this row: the vendor's dotted form (`claude-haiku-4.5`), the aggregator id (`anthropic/claude-haiku-4.5`). A request under any of them is routed and billed as this row. |
 | `discounted`, `discount_percent_label` | Whether this model is sold below vendor list, and by how much. |
 | `user_discount_percent`, `user_tier_discounts` | Your account's own discount, if any, on top of the public one. |
 | `tokens_per_sec`, `tokens_per_sec_approx` | Measured throughput, for picking between models of similar quality. |
 | `credit_metered`, `usd_per_credit` | Set on the Topaz restoration models, which meter in credits. |
-| `capabilities` | Reference-input caps, resolutions, aspect ratios and duration range for media models; `context_tokens` and `max_output_tokens` for text models, taken from the vendor's published figures (the hourly OpenRouter record) where available. |
+| `capabilities` | Reference-input caps, resolutions, aspect ratios and duration range for media models; `context_tokens` and `max_output_tokens` for text models, taken from the vendor's published figures (the hourly OpenRouter record) where available. `max_output_tokens` is the vendor's published cap or `null` when none is published — never a figure derived from the window. A route may cap replies lower than the vendor does. Where the cap is a hard vendor limit, a request above it is refused up front: HTTP 400, `code: max_tokens_exceeded`, `param` naming `max_tokens` or `max_completion_tokens`. |
 
 The response also carries `default_model` — currently **`claude-haiku-4-5`**,
 used when a chat request omits `model`.
@@ -311,7 +311,7 @@ for log in history["logs"]:
 
 | Endpoint | Returns |
 |----------|---------|
-| `GET /v1/llm/usage/history` | Per-request log lines, newest first. Money is in USD: `cost_usd` per line and `total_cost_usd` in `statistics`. `cost_rub` / `total_cost_rub` are deprecated aliases of the same USD numbers — they never held rubles — and will be removed. |
+| `GET /v1/llm/usage/history` | Per-request log lines, newest first. `cost_usd` per line and `total_cost_usd` in `statistics` are USD; `cost_rub` / `total_cost_rub` are the same charges in rubles, with `rub_pricing` per line: `"billed"` — at the rate of the top-up the money came from ([ruble billing](/changelog#ruble-billing-at-the-rate-you-topped-up-at)), `"market"` — at today's top-up rate (charges made before ruble billing was switched on, and accounts billed in dollars). |
 | `GET /v1/llm/usage/breakdown` | Daily / weekly aggregates by model. |
 | `GET /v1/llm/usage/requests` | Request-level records, with `GET /v1/llm/usage/requests/{log_id}` for one in full. |
 
