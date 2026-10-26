@@ -44,16 +44,29 @@ Successful responses carry the `X-RateLimit-*` headers.
 ### `usage.cost` is what you were charged
 
 Every `chat/completions` response carries `usage.cost`: the amount GPUniq
-debited for the call, in USD. On a stream it is the list-price estimate
-(cached input included); the exact charge with your personal discount is in
-`GET /v1/llm/usage/requests/{id}`. Upstream cost breakdowns are never
+debited for the call, in USD, with your personal discount and cached input
+included. On a stream it rides in the last chunk before `data: [DONE]`,
+which is sent once the call is billed; if billing is delayed past a few
+seconds, that chunk leaves without the exact charge and
+`GET /v1/llm/usage/requests/{id}` has it. Upstream cost breakdowns are never
 forwarded.
 
 With [ruble billing](/changelog#ruble-billing-at-the-rate-you-topped-up-at)
-on, a non-stream response also carries `usage.cost_rub` and
-`usage.fx_rate_rub`: the same charge in rubles at the rate of the top-up the
-money came from. Streams do not know the final charge yet; read it from
-`GET /v1/llm/usage/requests/{id}`, where every row has `cost_rub` and
+on, the response also carries `cost_rub` and `fx_rate_rub`: the same charge
+in rubles at the rate of the top-up the money came from. Accounts billed in
+dollars get neither key. Every route that charges reports them:
+
+| Route | Where |
+|---|---|
+| `POST /v1/openai/chat/completions` | `usage`; stream: the last usage chunk |
+| `POST /v1/responses`, `/v1/openai/responses` | `usage` (with `cost` in USD); stream: `response.completed` → `response.usage` |
+| `POST /v1/messages` | `usage` (with `cost` in USD); stream: `message_delta` → `usage` |
+| `POST /v1/openai/images/generations` | `usage`, next to `cost_usd` |
+| `POST /v1/openai/embeddings`, `/v1/openai/rerank` | `usage` |
+| `POST /v1/llm/chat/completions`, `/v1/llm/images/generations` | next to `cost_usd` |
+| `GET /v1/llm/{chat,images,videos,music,audio}/jobs/{id}`, Topaz jobs | the completed job, next to `cost_usd` |
+
+`GET /v1/llm/usage/requests/{id}` has the same figures for every row, plus
 `rub_pricing` (`"billed"` or `"market"`).
 
 ### Models list

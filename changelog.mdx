@@ -7,6 +7,29 @@ description: Track the latest updates and improvements to GPUniq.
   Follow us on [Telegram](https://t.me/gpuniq) for real-time announcements.
 </Callout>
 
+<Update label="2026-10-26" description="The ruble price in every response that charges" tags={["improvement", "billing"]}>
+
+## `cost_rub` in the response, not only in the usage log
+
+With ruble billing on, `cost_rub` and `fx_rate_rub` reached only non-stream
+`chat/completions`; every other route charged in rubles but showed the
+figure only in the usage log. Now each response that charges carries them
+next to the USD figure — the full list is in
+[OpenAI compatibility](/llm/openai-compat#usagecost-is-what-you-were-charged).
+
+- Streaming `chat/completions`: the last usage chunk is sent once the call
+  is billed and carries the exact `usage.cost` (until now a list-price
+  estimate, and missing for open-weight models) plus the ruble pair.
+- Responses and Messages, stream and non-stream: `usage.cost`,
+  `usage.cost_rub`, `usage.fx_rate_rub`.
+- `images/generations` on both surfaces, and completed image, video, music,
+  audio, Topaz and chat jobs: `cost_rub` and `fx_rate_rub` next to
+  `cost_usd`.
+- Accounts billed in dollars get no ruble keys at all:
+  `/v1/llm/chat/completions` no longer returns `"cost_rub": null`.
+
+</Update>
+
 <Update label="2026-10-22" description="Delivered video jobs answer for 7 days; drafts reach 1080p for their whole 7 days" tags={["improvement", "llm"]}>
 
 ## Video jobs: 7 days instead of 2 hours
