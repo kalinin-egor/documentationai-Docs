@@ -440,9 +440,11 @@ That is the keep-alive path: `max_tokens > 4096` without `stream: true` is serve
 
 ### "I get `insufficient_balance` but my dashboard shows funds."
 
-The pre-flight estimate uses worst-case `max_tokens × retail_output_rate`. A request asking for `max_tokens=4096` against Claude Opus reserves ~$0.08 even before the model has emitted a single token. If you have $0.04 free, the pre-flight rejects with `insufficient_balance` regardless of what the real call would have cost.
+Before sending a standard OpenAI-compatible chat completion to a provider, GPUniq temporarily reserves the estimated input cost plus the cost of the reserved output tokens at the applicable rates. The output estimate uses `max_tokens` or `max_completion_tokens`, whichever is higher if both are provided. By default, it is capped at 4,096 tokens per requested choice (`n`). If neither limit is provided, the estimate uses that ceiling.
 
-**Fix:** keep at least one full request's worth of headroom on the balance, or cap `max_tokens` to a realistic ceiling for the model.
+For example, at $20 per million output tokens, the reserve for 4,096 output tokens is about $0.08 before any input cost. If you have $0.04 available, the request returns `insufficient_balance` even if the eventual reply would have been short. Other requests in flight can reduce the amount available. GPUniq releases any unused reserve when the request settles.
+
+**Fix:** keep enough available balance to cover the estimate, request a realistic output limit, or send fewer requests in parallel.
 
 ### "I get `upstream_bad_response` randomly."
 
