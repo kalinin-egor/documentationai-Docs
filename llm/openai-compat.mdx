@@ -43,32 +43,28 @@ Successful responses carry the `X-RateLimit-*` headers.
 
 ### `usage.cost` is what you were charged
 
-Every `chat/completions` response carries `usage.cost`: the amount GPUniq
-debited for the call, in USD, with your personal discount and cached input
-included. On a stream it rides in the last chunk before `data: [DONE]`,
-which is sent once the call is billed; if billing is delayed past a few
-seconds, that chunk leaves without the exact charge and
-`GET /v1/llm/usage/requests/{id}` has it. Upstream cost breakdowns are never
-forwarded.
+The `usage.cost` field on `chat/completions` reports the dollars GPUniq charged after discounts and cached-input pricing. To read the receipt on a stream, request `stream_options.include_usage: true` and read the last usage chunk before `data: [DONE]`.
 
-With [ruble billing](/changelog#ruble-billing-at-the-rate-you-topped-up-at)
-on, the response also carries `cost_rub` and `fx_rate_rub`: the same charge
-in rubles at the rate of the top-up the money came from. Accounts billed in
-dollars get neither key. Every route that charges reports them:
+With [ruble billing](/changelog#ruble-billing-at-the-rate-you-topped-up-at) enabled, `cost_rub` is the ruble amount recorded for the same operation. GPUniq spends the oldest available top-up first. If one charge uses two top-ups at different rates, `fx_rate_rub` is their weighted rate for that charge. A confirmed zero-ruble charge can have `cost_rub: 0` and no effective rate. Accounts billed in dollars omit both ruble fields.
 
-| Route | Where |
+| Endpoint | Receipt in a successful response |
 |---|---|
-| `POST /v1/openai/chat/completions` | `usage`; stream: the last usage chunk |
-| `POST /v1/responses`, `/v1/openai/responses` | `usage` (with `cost` in USD); stream: `response.completed` → `response.usage` |
-| `POST /v1/messages` | `usage` (with `cost` in USD); stream: `message_delta` → `usage` |
-| `POST /v1/openai/images/generations` | `usage`, next to `cost_usd` |
-| `POST /v1/openai/embeddings`, `/v1/openai/rerank` | `usage` |
-| `POST /v1/llm/chat/completions`, `/v1/llm/images/generations` | next to `cost_usd` |
-| `GET /v1/llm/{chat,images,videos}/jobs/{id}` | the completed job, next to `cost_usd` |
-| [Previously submitted Topaz, audio or music jobs](/llm/long-generations#previously-submitted-media-jobs) | the completed job, next to `cost_usd` |
+| `POST /v1/openai/chat/completions` | JSON `usage.cost_rub`, or `usage.cost_rub` in the last usage chunk |
+| `POST /v1/responses`, `/v1/openai/responses` | JSON `usage.cost_rub`, or `response.usage.cost_rub` in the `response.completed` event |
+| `POST /v1/messages` | JSON `usage.cost_rub`, or `usage.cost_rub` in the `message_delta` event |
+| `POST /v1/openai/images/generations` | `usage.cost_rub` alongside `usage.cost_usd` |
+| `POST /v1/openai/embeddings`, `/v1/openai/rerank` | `usage.cost_rub` |
+| `POST /v1/llm/chat/completions`, `/v1/llm/images/generations` | `data.cost_rub` alongside `data.cost_usd` |
+| `GET /v1/llm/{chat,images,videos}/jobs/{id}` | `data.cost_rub` on the completed job |
+| [Previously submitted Topaz, audio or music jobs](/llm/long-generations#previously-submitted-media-jobs) | `data.cost_rub` on the completed job |
 
-`GET /v1/llm/usage/requests/{id}` has the same figures for every row, plus
-`rub_pricing` (`"billed"` or `"market"`).
+During a delayed ruble settlement, a successful stream can send SSE comments while it waits. Keep reading through the terminal usage event. A Messages client can read the settled amounts from `event.usage` on `message_delta`.
+
+```json
+{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":31,"cache_read_input_tokens":6,"output_tokens":11,"cost":0.000162,"cost_rub":0.016654,"fx_rate_rub":102.803481}}
+```
+
+A dollar-billed stream can finish before a delayed settlement and omit the final cost. `GET /v1/llm/usage/requests/{id}` returns the recorded amounts and `rub_pricing`. The value `"billed"` identifies a ruble receipt. The value `"market"` identifies a market-rate conversion for display.
 
 ### Models list
 
