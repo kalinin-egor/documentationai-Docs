@@ -105,16 +105,6 @@
                     "icon": "video"
                   },
                   {
-                    "title": "Music & speech",
-                    "path": "llm/audio",
-                    "icon": "music"
-                  },
-                  {
-                    "title": "Topaz upscaling",
-                    "path": "llm/topaz",
-                    "icon": "maximize"
-                  },
-                  {
                     "title": "Long generations",
                     "path": "llm/long-generations",
                     "icon": "align-left"

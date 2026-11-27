@@ -157,8 +157,8 @@ prompt and the resulting image into the chat history as a turn. See
 
 ## The generations library
 
-Every image, video, music and audio generation you run is recorded. `GET
-/v1/llm/generations` returns a page of them, newest first.
+`GET /v1/llm/generations` lists your recorded generations, newest first,
+including past generations on retired models.
 
 | Query parameter | Effect |
 |-----------------|--------|
