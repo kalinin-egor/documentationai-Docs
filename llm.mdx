@@ -81,6 +81,11 @@ A dashboard JWT works in place of a key on native routes.
 not a ceiling — accounts can be raised, and a raised account limit cascades to
 its keys. The Python SDK retries automatically when it hits the limit.
 
+**Concurrency limit: 20 simultaneous LLM requests per account by default.**
+Chat, embeddings, and other LLM operations share this limit. See
+[Concurrent requests](/llm/errors#concurrent-requests) for scope, response
+headers, and retry guidance.
+
 <Callout kind="warning">
   **Getting `403` with `error code: 1010` on any endpoint? That is not
   the endpoint — it is your HTTP client's User-Agent.**
