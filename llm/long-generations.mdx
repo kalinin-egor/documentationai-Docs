@@ -175,6 +175,14 @@ Models with hidden chain-of-thought reasoning (Gemini 3 Pro, GPT-5 o3, DeepSeek 
 
 All 50 tokens went into thinking, none into the visible answer. **Give reasoning models at least 2000-4000 `max_tokens`** to leave room for the chain of thought plus a real reply. The 4096 non-stream cap is usually a poor fit for them — combine `stream: true` with `max_tokens: 8000-16000` instead.
 
+For streamed `deepseek/deepseek-v4-pro-0813` requests on the standard
+OpenRouter route, a final meter that confirms the whole output limit went
+to reasoning is reported as `finish_reason: "length"` in Chat Completions
+or `status: "incomplete"` in Responses, with reasoning usage included.
+Those tokens count toward the charge even when the visible answer is empty.
+To try again with more headroom, submit a new request with an appropriate
+output limit. GPUniq does not automatically retry with a higher limit.
+
 ## What used to be here
 
 Earlier versions of this doc described an "auto-aggregate" mode where the server silently upgraded `max_tokens > 8000` non-stream requests to streaming. **That mode has been removed** (commit `3a53f89`, May 2026). The current behaviour is the cleaner contract: non-stream is capped at 4096, anything past that requires explicit `stream: true` or the job-based API.

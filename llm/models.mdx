@@ -87,6 +87,13 @@ variants (`:batch`, `:free`, `:online`, `:nitro`, …) are not listed either —
 they cannot be called through `chat/completions`; only `:thinking` and
 `:extended`, which are distinct models, stay.
 
+A paid rolling alias such as `~openai/gpt-luna-latest` appears in
+`external_models` and in authenticated `GET /v1/openai/models` while the
+OpenRouter registry includes it. Send the full alias as `model` to follow
+the current member of the family. GPUniq refreshes the OpenRouter registry
+hourly and applies its external-model markup to the published rates.
+The serving model and the rates can change after a refresh.
+
 <Callout kind="warning">
   For video models, treat `capabilities` as a hint and the
   [video request reference](/llm/video#request-body) as the contract. A few
