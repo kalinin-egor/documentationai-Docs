@@ -141,6 +141,19 @@ for chunk in stream:
         print(delta, end="", flush=True)
 ```
 
+### When streaming is unavailable
+
+If the gateway cannot find a streaming route, it returns HTTP 503 with
+`error.code` set to `no_streaming_upstream` before the stream opens.
+The gateway makes zero generation attempts for that request. If your
+application accepts a complete JSON answer, it can issue a new request
+with `stream: false` and omit `stream_options`. Handle the result as a
+regular Chat Completion. The second request is billed if it succeeds.
+
+Limit that retry to the initial HTTP 503 with this exact error code.
+A timeout, lost connection, or error event after streaming starts can
+occur after the provider has already produced output.
+
 ## Images
 
 `POST /v1/openai/images/generations` matches OpenAI's `images.generate`
