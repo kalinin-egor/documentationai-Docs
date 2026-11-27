@@ -97,6 +97,22 @@ GPUniq applies its external-model markup to the rates in the
 `retail_input_usd_per_mtok` and `retail_output_usd_per_mtok` on the alias's
 `external_models` row for the current GPUniq prices.
 
+### Compare aliases and route prices
+
+Use the catalog row’s `slug` as the billing identifier. For example,
+`MiniMax-M2.5` resolves to `minimax-m2.5`, and `hailuo-2.3` resolves to
+the video model `hailuo-2-3`. Each spelling uses its canonical model’s
+capabilities and tariff. The catalog’s `aliases` array lists compatible
+spellings for a row.
+
+For a chat model, call `GET /v1/llm/routes?model=minimax-m2.5` with your
+API key before selecting a specific `route`. Each entry reports its
+`streaming` capability, current `available` flag, and input and output
+prices per million tokens under `price`. A `price.basis` of `provider`
+means the route has a separate tariff. A value of `catalog` uses the
+catalog tariff. Measured `tokens_per_sec`, when available, describes past
+throughput. It gives no guarantee about first-token or total response time.
+
 ### Choosing a model instead of Jev Router
 
 `typesafe/jev-router` chooses the serving model after it receives your
