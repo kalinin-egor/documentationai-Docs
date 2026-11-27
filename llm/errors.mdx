@@ -127,10 +127,37 @@ The complete list of stable error codes returned by GPUniq.
 |---|---|---|---|
 | `rate_limit_per_key` | 429 | `rate_limit_exceeded` | One API key exceeded its per-minute window. |
 | `rate_limit_per_user` | 429 | `rate_limit_exceeded` | Your user account exceeded the aggregate per-minute window across **all** your API keys. |
+| `too_many_inflight_requests` | 429 | `rate_limit_error` | The account already has its maximum number of LLM requests in progress. |
 
-The 429 carries `Retry-After` (seconds), `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers — the OpenAI SDK consumes these automatically for its built-in backoff. Successful API-key responses carry the three `X-RateLimit-*` headers too, so you can keep headroom before you hit the limit; browser clients can read them (they are CORS-exposed, together with `X-Request-ID`). The window is a true sliding 60-second one (Redis ZSET), not a fixed-bucket counter, so the limit can't be bypassed at the minute boundary.
+For a per-minute limit, the 429 carries `Retry-After` (seconds), `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers — the OpenAI SDK consumes these automatically for its built-in backoff. Successful API-key responses carry the three `X-RateLimit-*` headers too, so you can keep headroom before you hit the limit; browser clients can read them (they are CORS-exposed, together with `X-Request-ID`). The window is a true sliding 60-second one (Redis ZSET), not a fixed-bucket counter, so the limit can't be bypassed at the minute boundary.
 
-**Recovery:** Honour `Retry-After`. If you regularly hit `rate_limit_per_key`, the per-key limit is bumpable from the dashboard. If you hit `rate_limit_per_user`, the aggregate cap is bumpable on request — contact support.
+**Recovery for per-minute limits:** Honour `Retry-After`. If you regularly hit `rate_limit_per_key`, the per-key limit is bumpable from the dashboard. If you hit `rate_limit_per_user`, the aggregate cap is bumpable on request — contact support.
+
+#### Concurrent requests
+
+The default is **20 simultaneous LLM requests per account**. The limit can be configured per account. A change takes effect when the next request is admitted and leaves requests already in progress running. This limit is independent of requests per minute and upstream token throughput.
+
+OpenAI-compatible Chat Completions (including streaming), Responses, embeddings, and rerank share the workspace owner's limit. Native chat completions, command generation, and chat job creation use the same budget. API keys count toward the account that owns the key. For Anthropic Messages and native conversation messages authenticated with a dashboard session, the request counts toward the signed-in user's account. Polling an existing chat job uses no slot.
+
+The response headers report the effective limit and how many slots were free immediately after admission. For example, a successful request on an idle account with the default limit receives:
+
+```http
+HTTP/1.1 200 OK
+X-GPUniq-Inflight-Limit: 20
+X-GPUniq-Inflight-Remaining: 19
+```
+
+When all slots are occupied, the API returns `too_many_inflight_requests` before opening a stream:
+
+```http
+HTTP/1.1 429 Too Many Requests
+X-GPUniq-Inflight-Limit: 20
+X-GPUniq-Inflight-Remaining: 0
+```
+
+The successful request that takes the last slot also reports `X-GPUniq-Inflight-Remaining: 0`. A value of `-1` means the remaining count is unavailable or the limit is disabled. Both headers are available to browser clients through CORS. Concurrent requests can change the remaining count immediately after this snapshot.
+
+**Recovery:** Check the error code. For `too_many_inflight_requests`, wait for an active request to finish before retrying. If your client cannot observe active requests, use a bounded exponential backoff with jitter. The `rate_limit_per_key` and `rate_limit_per_user` codes indicate a per-minute limit. Upstream rate-limit errors have their own codes.
 
 ### Model selection
 
