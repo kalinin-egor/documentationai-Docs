@@ -54,7 +54,7 @@ budgeting:
 | `retail_cached_input_usd_per_mtok` | What cached input costs on the model's primary route, or `null` when no route discounts it. Applied only when the provider that served your call gave GPUniq that discount — see [How pricing works](#how-pricing-works). |
 | `retail_usd_per_image` | Flat price per delivered image. Video and music rows still carry their unit price here for one more release — read `retail_usd_per_unit` for them. |
 | `retail_usd_per_unit` + `video_billing_unit` / `audio_billing_unit` | Media price and the unit it is charged in — `video`, `second`, `track` or `character`. |
-| `pricing` | Structured prices by variant where a table exists: `per_second_usd` by resolution (Seedance, with the reference-to-video rate), `by_resolution_usd` per clip at the model's kickoff defaults (Kling / Veo, spelled out in `assumes`), `by_size_usd` per image tier. `null` for everything else. |
+| `pricing` | Structured pricing when available. Flat media prices use `unit` and `per_unit_usd`. Variant tables use `per_second_usd`, `by_resolution_usd` or `by_size_usd`. |
 | `available`, `unavailable_reason` | Whether a live route serves the model right now. `unavailable_reason` is `no_route` (nothing serves the slug — including a model every upstream has stopped offering, checked hourly) or `all_routes_disabled`. Hide a row with `available: false` — its request would fail. |
 | `aliases` | Other spellings that resolve to this row: the vendor's dotted form (`claude-haiku-4.5`), the aggregator id (`anthropic/claude-haiku-4.5`). A request under any of them is routed and billed as this row. |
 | `discounted`, `discount_percent_label` | Whether this model is sold below vendor list, and by how much. |
@@ -62,6 +62,19 @@ budgeting:
 | `tokens_per_sec`, `tokens_per_sec_approx` | Measured throughput, for picking between models of similar quality. |
 | `credit_metered`, `usd_per_credit` | Set on the Topaz restoration models, which meter in credits. |
 | `capabilities` | Reference-input caps, resolutions, aspect ratios and duration range for media models; `context_tokens` and `max_output_tokens` for text models, taken from the vendor's published figures (the hourly OpenRouter record) where available. `max_output_tokens` is the vendor's published cap or `null` when none is published — never a figure derived from the window. A route may cap replies lower than the vendor does. Where the cap is a hard vendor limit, a request above it is refused up front: HTTP 400, `code: max_tokens_exceeded`, `param` naming `max_tokens` or `max_completion_tokens`. |
+
+The `assumes` object on a Kling or Veo `by_resolution_usd` table lists the
+request options used for its per-clip prices. For other options, use the
+[video cost estimate](/llm/video#models-pricing) with the intended request.
+Seedance publishes a separate output rate in
+`with_reference_video_per_second_usd` and the reference-input rate in
+`reference_input_per_second_usd`. Image rows can include `input_image_usd`
+when each input image is metered separately.
+
+GPT‑4o Search publishes `pricing.mode: "cost_plus"` with `estimated: true`.
+The estimate combines `retail_input_usd_per_mtok`,
+`retail_output_usd_per_mtok` and `retail_fee_usd_per_call` within that
+object. `assumes.search_context_size` identifies the search configuration.
 
 The response also carries `default_model` — currently **`claude-haiku-4-5`**,
 used when a chat request omits `model`.
@@ -122,7 +135,7 @@ swaps `usd` for `rub` in its name and holds the ruble amount:
 | `retail_usd_per_image` | `retail_rub_per_image` |
 | `retail_usd_per_unit` | `retail_rub_per_unit` |
 | `retail_cached_input_usd_per_mtok` | `retail_cached_input_rub_per_mtok` |
-| `pricing.per_second_usd`, `pricing.by_resolution_usd`, `pricing.by_size_usd` | the same keys with `rub` |
+| Nested amounts in `pricing`, including `per_unit_usd`, `input_image_usd` and `retail_fee_usd_per_call` | The corresponding keys with `rub` |
 | `official_usd_per_unit` | `official_rub_per_unit` |
 | `usd_per_credit` | `rub_per_credit` |
 | `base_usd_per_mtok` (top level) | `base_rub_per_mtok` |
