@@ -79,8 +79,6 @@
         "llm/embeddings",
         "llm/images",
         "llm/video",
-        "llm/audio",
-        "llm/topaz",
         "llm/long-generations",
         "llm/errors"
       ]
