@@ -61,7 +61,7 @@ With [ruble billing](/changelog#ruble-billing-at-the-rate-you-topped-up-at) enab
 During a delayed ruble settlement, a successful stream can send SSE comments while it waits. Keep reading through the terminal usage event. A Messages client can read the settled amounts from `event.usage` on `message_delta`.
 
 ```json
-{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":18,"cost":0.000162,"cost_rub":0.016654,"fx_rate_rub":102.803481}}
+{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":31,"cache_read_input_tokens":6,"output_tokens":11,"cost":0.000162,"cost_rub":0.016654,"fx_rate_rub":102.803481}}
 ```
 
 A dollar-billed stream can finish before a delayed settlement and omit the final cost. `GET /v1/llm/usage/requests/{id}` returns the recorded amounts and `rub_pricing`. The value `"billed"` identifies a ruble receipt. The value `"market"` identifies a market-rate conversion for display.
