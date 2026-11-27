@@ -97,6 +97,21 @@ GPUniq applies its external-model markup to the rates in the
 `retail_input_usd_per_mtok` and `retail_output_usd_per_mtok` on the alias's
 `external_models` row for the current GPUniq prices.
 
+### Choosing a model instead of Jev Router
+
+`typesafe/jev-router` chooses the serving model after it receives your
+request. Its registry entry has no fixed input or output price. GPUniq
+requires a price it can quote before taking a balance hold, so Chat
+Completions rejects this ID with `model_not_found`. The request has no
+generation charge.
+
+For chat, choose an ID from `GET /v1/openai/models`, for example
+`gpt-6.1-sol` or `gemini-2.5-flash`. Read that model's input and output
+rates from the catalog using your API key and set `max_tokens` to limit
+output. For typed classification or extraction, a separate model,
+`~typesafe/jev-latest`, accepts `state` and `questions` at
+`POST /v1/openai/decisions` when listed in `decision_models`.
+
 <Callout kind="warning">
   For video models, treat `capabilities` as a hint and the
   [video request reference](/llm/video#request-body) as the contract. A few
