@@ -136,7 +136,7 @@ The 429 carries `Retry-After` (seconds), `X-RateLimit-Limit`, `X-RateLimit-Remai
 
 | `code` | HTTP | OpenAI `type` | When |
 |---|---|---|---|
-| `model_not_found` | 400 | `invalid_request_error` | Slug isn't in the GPUniq catalog. Fetch `/v1/openai/models` for the current list. |
+| `model_not_found` | 400 or 404 | `invalid_request_error` | The slug isn't in the catalog. A request for a retired media model returns 404 without starting a job. Fetch `/v1/llm/models/catalog` for the current list. |
 | `model_required` | 400 | `invalid_request_error` | `body.model` is missing or empty. |
 | `model_is_image` | 400 | `invalid_request_error` | You called `/chat/completions` with an image-generation slug. Use `POST /v1/openai/images/generations` instead. |
 | `model_is_retrieval` | 400 | `invalid_request_error` | You called `/chat/completions` with an embedding or rerank slug. Use [`POST /v1/openai/embeddings` or `/rerank`](/llm/embeddings) instead. |
@@ -158,7 +158,7 @@ The 429 carries `Retry-After` (seconds), `X-RateLimit-Limit`, `X-RateLimit-Remai
 | `invalid_max_tokens` | 400 | `invalid_request_error` | `max_tokens` ≤ 0 or above the model's output cap. |
 | `invalid_messages_format` | 400 | `invalid_request_error` | A message has an unsupported role or content shape (e.g. malformed multimodal parts). |
 | `invalid_image_payload` | 400 | `invalid_request_error` | Embedded image base64 is malformed or the URL is unreachable. |
-| `invalid_request` | 400 | `invalid_request_error` | A required field is missing or violates the endpoint contract — used by image/video/music surfaces where the offending field is named in `error.message`. For video, common cases: i2v slug without `image_url`, motion-control slug without both `image_url` and `video_url`. |
+| `invalid_request` | 400 | `invalid_request_error` | A required field is missing or violates the endpoint contract — used by image and video surfaces where the offending field is named in `error.message`. For video, common cases: i2v slug without `image_url`, motion-control slug without both `image_url` and `video_url`. |
 | `content_filter` | 400 | `content_filter` | The upstream blocked the content under its safety policy. |
 
 ### Streaming
@@ -193,19 +193,21 @@ GPUniq routes every chat completion through a cost-sorted fallback chain of upst
 | `render_timeout` | 504 | `timeout_error` | Synchronous image render only: the whole provider cascade ran past its 300-second budget and was abandoned. **Nothing was charged.** Retry, or move to `POST /v1/llm/images/jobs`, which keeps the full per-provider budgets because it holds no connection. Set your client timeout above 300 s so you read this instead of your own socket error. |
 | `upstream_rate_limit` | 429 | `rate_limit_exceeded` | Every upstream for this model is currently rate-limited. Backoff and retry. |
 | `upstream_bad_response` | 502 | `api_error` | All eligible upstreams returned a non-2xx 4xx for this request. |
-| `upstream_validation_error` | 400 | `invalid_request_error` | The internal routing layer rejected the payload as malformed (image/video/music surfaces). `meta.hint` may carry a hand-written remediation pointing at the right field. Adjust the request and retry — retrying without changes won't help. |
+| `upstream_validation_error` | 400 | `invalid_request_error` | The internal routing layer rejected the payload as malformed (image and video surfaces). `meta.hint` may carry a hand-written remediation pointing at the right field. Adjust the request and retry — retrying without changes won't help. |
 | `upstream_server_error` | 502 | `api_error` | All eligible upstreams returned a 5xx. |
 | `gateway_misconfigured` | 503 | `api_error` | The deployment is missing required API keys for any eligible upstream. Operator-visible — contact support. |
 
 **Recovery:** Most upstream errors are transient. The OpenAI SDK's default retry policy handles them automatically; manually, exponential backoff with a 30-second ceiling is enough. `upstream_timeout` on a long generation is the one exception — switching to `stream: true` is the structural fix.
 
-### Async jobs (video / music / image-jobs surfaces)
+### Image and video jobs
 
-The async surfaces (`POST /v1/llm/videos/jobs`, `POST /v1/llm/music/jobs`, `POST /v1/llm/images/jobs`) return a stable GPUniq `job_id` on kickoff. The poll endpoint surfaces job state inside a success envelope (`exception: 0`) with `data.status` ∈ `{ pending, processing, completed, failed }`. Only the *envelope-level* errors below are surfaced as non-2xx:
+The image and video job endpoints return a stable GPUniq `job_id` on kickoff.
+The status response carries `exception: 0` and `data.status` of `pending`,
+`processing`, `completed` or `failed`. Check the envelope as well as the HTTP status:
 
-| `code` | HTTP | OpenAI `type` | When |
+| `data.error_code` | HTTP | `exception` | When |
 |---|---|---|---|
-| `job_not_found` | 404 | `invalid_request_error` | The id doesn't belong to your account, never existed, or the job record has expired — **15 minutes** after kickoff for images, **2 hours** for video, **60 minutes** for music, audio and Topaz. Re-kick off the job. |
+| `job_not_found` | 200 | 404 | The ID belongs to another account, is unknown or the job record has expired. The job record window is 15 minutes for images and 2 hours for video. See [previously submitted media jobs](/llm/long-generations#previously-submitted-media-jobs) for retired models. |
 
 A `data.status: "failed"` payload is **not** an HTTP error — the request itself was valid, the upstream just didn't deliver. Both terminal payloads, `completed` and `failed`, are **replayed to every later poll** until the record expires, so a poll lost to a timeout does not lose the result; you are charged once, on the poll that first delivered it (an image replay carries the hosted `url` without the `b64_json`). Re-kick off to retry a failure. Nothing was charged for a `failed` job.
 
@@ -259,8 +261,7 @@ Two timing facts worth wiring into your client:
   charged when the render finishes whether or not you poll, and the result stays pollable for 15
   minutes — see [How pricing works](/llm/models#how-pricing-works).
 
-Failed jobs are billed **nothing**, regardless of the cause. Music job failures currently carry only
-the human-readable `error` string.
+Failed jobs are billed **nothing**, regardless of the cause.
 
 ### Video jobs: typed failure causes
 

@@ -1,16 +1,15 @@
 ---
 title: LLM & Media API
-description: Chat, reasoning, images, video, music, speech and upscaling through one API key and one USD balance. Claude, GPT, Gemini, Grok, DeepSeek, Qwen, Nano Banana, Seedance, Veo and more.
+description: Chat, reasoning, images and video through one API key and one USD balance. Claude, GPT, Gemini, Grok, DeepSeek, Qwen, Nano Banana, Seedance, Veo and more.
 ---
 
-One API key, one balance, one usage log — **370+ models** covering text,
-images, video, music, speech and restoration.
+Use one API key, balance and usage log for text, image and video models.
 
 There are two ways in:
 
 1. **Native GPUniq API** (`/v1/llm/*`) — wrapped responses with USD cost on
    every call, server-side chat sessions, the generations library, and the
-   async job surfaces for every media kind.
+   async image and video jobs.
 2. **Drop-in compatibility** — `/v1/openai/*` replaces `api.openai.com/v1`,
    and `/v1/messages` is a native Anthropic Messages endpoint. Claude Code,
    Cursor, Continue.dev, Aider, LiteLLM and the official SDKs work without
@@ -39,15 +38,8 @@ There are two ways in:
     image.
   </Card>
   <Card title="Video generation" href="/llm/video" icon="video">
-    Veo 3.1, Kling, Seedance, Sora, Wan, Runway — references, durations,
+    Veo 3.1, Kling, Seedance, Wan, Runway — references, durations,
     first/last frame.
-  </Card>
-  <Card title="Music & speech" href="/llm/audio" icon="music">
-    Text-to-music with lyrics, ElevenLabs speech, dialogue, sound effects,
-    voice isolation.
-  </Card>
-  <Card title="Topaz upscaling" href="/llm/topaz" icon="maximize">
-    Gigapixel and Video AI restoration engines, metered in credits.
   </Card>
   <Card title="Long generations" href="/llm/long-generations" icon="align-left">
     Streaming, the 4096-token non-streaming cap, and reasoning-token headroom.
@@ -158,6 +150,5 @@ Every failure returns a stable OpenAI error envelope with a structured `code` yo
 Generated images and videos are mirrored to GPUniq storage: the response
 carries both the upstream URL and a GPUniq-hosted copy, kept for **7 days**.
 That copy is a delivery buffer, not an archive — download the bytes if you need
-them to last. **Music and audio are not mirrored**; download those as soon as
-the job completes. Details:
-[Where delivered media lives](/llm/video#where-delivered-media-lives).
+them to last. See [where delivered media lives](/llm/video#where-delivered-media-lives)
+and [how to retrieve results from previously submitted media jobs](/llm/long-generations#previously-submitted-media-jobs).

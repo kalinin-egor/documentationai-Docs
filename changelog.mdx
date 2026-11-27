@@ -39,7 +39,7 @@ description: Track the latest updates and improvements to GPUniq.
 - ElevenLabs TTS: the stock voice is now `EkK5I93UQWFDigLMpZcX` — the
   previous one was not served, so every TTS job without `voice` failed.
   `voice` (and every dialogue turn's) is checked at kickoff against
-  [the served list](/llm/audio#voices): HTTP 400 with the field in
+  the voice list available at that time: HTTP 400 with the field in
   `data.meta.param`.
 
 </Update>
@@ -472,8 +472,7 @@ Dedicated job surface:
 | Video | `POST /v1/llm/topaz/video/jobs` → poll `GET .../{job_id}` |
 | Catalog | `GET /v1/llm/topaz/models` (live list + `usd_per_credit`) |
 
-See the [Topaz upscaling guide](/llm/topaz) for the model catalog,
-parameters, and end-to-end examples.
+For jobs submitted before retirement, see [previously submitted media jobs](/llm/long-generations#previously-submitted-media-jobs).
 
 </Update>
 

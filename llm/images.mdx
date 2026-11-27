@@ -86,7 +86,7 @@ while time.time() < deadline:
 ## Parameters
 
 <ParamField body="model" type="string" required>
-  Any image slug from the [catalog](#models-pricing) — the Nano Banana family, `gpt-image-2` and its tiers, `gpt-image-2-5-flare` / `gpt-image-2-5-sunburst` and their tiers, `gpt-image-1-5`, `gpt-4o-image`, `grok-4-image`, `flux-2-pro`, `flux-2-flex`, `flux-kontext-pro`, `flux-kontext-max`, `seedream-4`, `seedream-4-5`, `seedream-5-0-lite`, `seedream-5-pro`, `z-image`, `wan-2-7-image`, `wan-2-7-image-pro`, `kling-o1-image`, `kling-o3-image`, or the `mj_*` Midjourney actions. (Topaz upscaling models live on their own surface — see the [Topaz guide](/llm/topaz).)
+  Any image slug from the [catalog](#models-pricing) — the Nano Banana family, `gpt-image-2` and its tiers, `gpt-image-2-5-flare` / `gpt-image-2-5-sunburst` and their tiers, `gpt-image-1-5`, `gpt-4o-image`, `grok-4-image`, `flux-2-pro`, `flux-2-flex`, `flux-kontext-pro`, `flux-kontext-max`, `seedream-4`, `seedream-4-5`, `seedream-5-0-lite`, `seedream-5-pro`, `z-image`, `wan-2-7-image`, `wan-2-7-image-pro`, `kling-o1-image`, `kling-o3-image`, or the `mj_*` Midjourney actions.
 </ParamField>
 
 <ParamField body="prompt" type="string" required>
@@ -481,9 +481,7 @@ chat row.
 subset to memorise and no reason to keep a synchronous code path around:
 if the model is in the table above, `POST /v1/llm/images/jobs` accepts it.
 
-`n` must be `1` — issue separate jobs in parallel for batches. (Topaz
-upscaling/enhancement has its own dedicated job surface — see the
-[Topaz guide](/llm/topaz).)
+`n` must be `1` — issue separate jobs in parallel for batches.
 
 Behind the job id there are two execution modes, and the difference is
 not visible in the API contract — same kickoff, same polling, same

@@ -1,6 +1,6 @@
 ---
 title: Video generation
-description: Text-to-video, image-to-video, first/last-frame and reference-to-video across Veo 3.1, Kling, Seedance, Sora, Wan and Runway — one async job API, charged on delivery.
+description: Text-to-video, image-to-video, first/last-frame and reference-to-video across Veo 3.1, Kling, Seedance, Wan and Runway — one async job API, charged on delivery.
 ---
 
 Every video model in the catalog runs on one async surface: `POST /v1/llm/videos/jobs`
@@ -123,8 +123,6 @@ not round to the nearest supported length, because silently rendering
 | `seedance-2`, `seedance-2-fast`, `seedance-2-mini` | any integer 4–15 | 5 |
 | `seedance-2-5` | any integer **4–30** | 5 |
 | `seedance-1-0-pro`, `seedance-1-5-pro` | 5 | 5 |
-| `sora-2-video`, `sora-2-pro-video` | 10 | 10 |
-| `sora-2-official`, `sora-2-pro-official` | 8 | 8 |
 
 <Callout kind="warning">
   **Veo does not take `duration: 5`.** It is the single most common 400 on
@@ -325,10 +323,6 @@ upstream's cap). The catalog's `pricing` block carries the tables:
 
 | Family | Slug | Headline / video | Notes |
 |--------|------|------------------|-------|
-| OpenAI Sora 2 | `sora-2-video` | $0.600 | Sora 2, default 10s |
-| OpenAI Sora 2 Pro | `sora-2-pro-video` | $1.000 | Premium quality, 10s |
-| Sora 2 Official | `sora-2-official` | $0.480 | 8s, official API |
-| Sora 2 Pro Official | `sora-2-pro-official` | $0.560 | 8s 1080p, official API |
 | Google Veo 3.1 Lite | `veo-3-1-lite` | from $0.30 | 720p / 1080p / 4K, 4–8s; i2v, first/last frame, reference-to-video |
 | Google Veo 3.1 Fast | `veo-3-1-fast` | from $0.60 | 720p / 1080p / 4K, 4–8s; i2v, first/last frame, reference-to-video |
 | Google Veo 3.1 Quality | `veo-3-1-quality` | from $2.50 | Flagship; 720p / 1080p / 4K, 4–8s; i2v, first/last frame |
@@ -783,9 +777,6 @@ edited at 480p bills 20 s; the same source extended by 4 s bills 14 s.
 Because an edit's output length isn't knowable at submit, the kickoff
 `estimated_cost_usd` assumes the source's measured length and the final
 `cost_usd` is recomputed from the upstream invoice.
-
-The adjacent post-processing surface is Topaz video upscaling
-(`POST /v1/llm/topaz/video/jobs`, see [Topaz](/llm/topaz)).
 
 **Cost**
 
