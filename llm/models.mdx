@@ -85,11 +85,17 @@ they cannot be called through `chat/completions`; only `:thinking` and
 `:extended`, which are distinct models, stay.
 
 A paid rolling alias such as `~openai/gpt-luna-latest` appears in
-`external_models` and in authenticated `GET /v1/openai/models` while the
-OpenRouter registry includes it. Send the full alias as `model` to follow
-the current member of the family. GPUniq refreshes the OpenRouter registry
-hourly and applies its external-model markup to the published rates.
-The serving model and the rates can change after a refresh.
+`external_models` and in authenticated `GET /v1/openai/models` after GPUniq
+imports its paid text-output entry. GPUniq refreshes the registry hourly.
+The snapshot expires 24 hours after the last successful registry refresh.
+Send the full alias as `model` to follow the current member of the family.
+The model that serves the request can change when OpenRouter updates the
+alias target.
+
+GPUniq applies its external-model markup to the rates in the
+[OpenRouter model registry](https://openrouter.ai/api/v1/models). Read
+`retail_input_usd_per_mtok` and `retail_output_usd_per_mtok` on the alias's
+`external_models` row for the current GPUniq prices.
 
 <Callout kind="warning">
   For video models, treat `capabilities` as a hint and the
